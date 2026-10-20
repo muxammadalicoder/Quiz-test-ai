@@ -8,13 +8,11 @@ import { fileURLToPath } from "node:url";
 import { randomInt } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached, chatReply } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
-const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "";
-const QUIZ_DELETE_PASSWORD = process.env.QUIZ_DELETE_PASSWORD || "";
 const ALLOW_GUEST = process.env.ALLOW_GUEST ? process.env.ALLOW_GUEST === "true" : !BOT_TOKEN;
 const ORIGINS = [
   ...(process.env.CLIENT_ORIGIN || "http://localhost:5173").split(","),
@@ -76,7 +74,6 @@ function auth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 const me = (req: Request) => (req as Authed).user;
-const isQuizAdmin = (u: User) => !!ADMIN_TELEGRAM_ID && !!QUIZ_DELETE_PASSWORD && !!u.tgId && String(u.tgId) === ADMIN_TELEGRAM_ID;
 
 function validateQuiz(body: any): { ok: true; data: Pick<Quiz, "title" | "description" | "category" | "isPublic" | "questions"> } | { ok: false; error: string } {
   const title = clean(body?.title, 60), description = clean(body?.description, 140);
@@ -122,7 +119,6 @@ app.post("/api/auth/guest", limit(10, 60000), (req, res) => {
 
 // ---- Himoyalangan yo'llar ----
 app.get("/api/me", auth, (req, res) => { res.json({ user: publicUser(me(req)) }); });
-app.get("/api/admin/status", auth, (req, res) => { res.json({ canDeleteQuizzes: isQuizAdmin(me(req)) }); });
 app.patch("/api/me", auth, limit(30, 60000), (req, res) => {
   const u = me(req);
   const name = req.body?.name !== undefined ? cleanName(req.body.name) : u.name;
@@ -167,13 +163,9 @@ app.put("/api/quizzes/:id", auth, limit(30, 60000), (req, res) => {
   Object.assign(q, v.data); save();
   res.json({ quiz: quizCard(q) });
 });
-app.delete("/api/quizzes/:id", auth, limit(5, 60000), (req, res) => {
-  const u = me(req);
-  if (!isQuizAdmin(u)) return res.status(403).json({ error: "Testni faqat administrator o‘chira oladi." });
-  if (!QUIZ_DELETE_PASSWORD || typeof req.body?.password !== "string" || req.body.password !== QUIZ_DELETE_PASSWORD)
-    return res.status(403).json({ error: "Administrator paroli noto‘g‘ri." });
+app.delete("/api/quizzes/:id", auth, (req, res) => {
   const q = quizzes()[req.params.id];
-  if (!q) return res.status(404).json({ error: "Test topilmadi." });
+  if (!q || q.ownerId !== me(req).id) return res.status(404).json({ error: "Test topilmadi." });
   delete quizzes()[q.id]; save(); res.json({ ok: true });
 });
 app.get("/api/leaderboard", auth, (_req, res) => {
@@ -266,19 +258,6 @@ app.post("/api/ai/tts", auth, limit(40, 60000), async (req, res) => {
   const audio = await tts(text);
   if (!audio) return res.status(502).json({ error: "Ovoz yaratilmadi." });
   res.json({ audio });
-});
-app.post("/api/ai/chat", auth, limit(20, 60000), async (req, res) => {
-  if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq. Serverda GEMINI_API_KEY sozlamasini tekshiring." });
-  const text = clean(req.body?.text, 2000);
-  const audio = typeof req.body?.audio === "string" ? req.body.audio : "";
-  const mime = String(req.body?.mime || "audio/webm").split(";")[0].trim().toLowerCase();
-  const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((m: any) => ({ role: String(m?.role || "user"), text: clean(m?.text, 1200) })) : [];
-  if (!text && !audio) return res.status(400).json({ error: "Xabar matni yoki ovoz yozuvi kerak." });
-  if (audio && (audio.length > 900000 || !["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/aac"].includes(mime))) return res.status(400).json({ error: "Ovoz formati qo‘llab-quvvatlanmaydi. Qayta yozib ko‘ring." });
-  if (!aiAllowed(me(req).id, "explain")) return res.status(429).json({ error: "AI so‘rov limiti tugadi. Keyinroq urinib ko‘ring." });
-  const reply = await chatReply({ text, audioB64: audio || undefined, mime, history });
-  if (!reply) return res.status(502).json({ error: "AI javob bera olmadi. API kaliti, model va limitlarni tekshiring." });
-  res.json({ text: reply });
 });
 app.post("/api/ai/listen", auth, limit(40, 60000), async (req, res) => {
   if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq." });

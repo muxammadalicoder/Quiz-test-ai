@@ -19,6 +19,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [sheetQuiz, setSheetQuiz] = useState<QuizCard | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"choose" | "solo" | "multiplayer">("choose");
+  const [canDeleteQuizzes, setCanDeleteQuizzes] = useState(false);
   const [soloId, setSoloId] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -48,6 +50,11 @@ export default function App() {
       setBoot(c.guest ? "login" : "tgonly");
     })();
   }, []);
+
+  useEffect(() => {
+    if (!user) { setCanDeleteQuizzes(false); return; }
+    api("/api/admin/status").then(d => setCanDeleteQuizzes(!!d.canDeleteQuizzes)).catch(() => setCanDeleteQuizzes(false));
+  }, [user?.id]);
 
   // Realtime ulanish
   useEffect(() => {
@@ -82,8 +89,15 @@ export default function App() {
     try { const d = await api(`/api/quizzes/${q.id}`); setSheetQuiz(null); setDraft({ id: q.id, title: d.quiz.title, description: d.quiz.description, category: d.quiz.category, isPublic: d.quiz.isPublic, questions: d.quiz.questions }); } catch (e: any) { say(e.message, true); }
   };
   const removeQuiz = async (q: QuizCard) => {
+    if (!canDeleteQuizzes) { say("Testni faqat administrator o‘chira oladi.", true); return; }
     if (!confirm(`“${q.title}” testini o‘chirasizmi?`)) return;
-    try { await api(`/api/quizzes/${q.id}`, { method: "DELETE" }); setSheetQuiz(null); setLibKey(k => k + 1); say("Test o‘chirildi."); } catch (e: any) { say(e.message, true); }
+    const password = prompt("Testni o‘chirish uchun administrator parolini kiriting:");
+    if (password === null) return;
+    if (!password) { say("Parol kiritilmadi.", true); return; }
+    try {
+      await api(`/api/quizzes/${q.id}`, { method: "DELETE", body: { password } });
+      setSheetQuiz(null); setLibKey(k => k + 1); say("Test o‘chirildi.");
+    } catch (e: any) { say(e.message, true); }
   };
 
   if (boot === "loading") return <div className="splash"><div className="logo">🎯</div><i className="spinner" /></div>;
@@ -103,13 +117,21 @@ export default function App() {
   if (!user) return null;
 
   const view = () => {
-    if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
+    if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} onExit={() => { setRoom(null); setTab("home"); setSelectionMode("choose"); }} />;
     if (soloId) return <Solo quizId={soloId} count={count} talk={talk} ai={!!cfg.ai} onExit={() => setSoloId("")} onUser={setUser} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     if (tab === "ai") return <Chat onExit={() => setTab("home")} />;
     switch (tab) {
-      case "home": return <Home user={user} go={t => (t === "create" ? setDraft(newDraft()) : setTab(t as Tab))} openQuiz={setSheetQuiz} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
-      case "library": return <Library categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} refreshKey={libKey} />;
+      case "home": return <Home user={user} go={t => {
+        if (t === "create") { setDraft(newDraft()); return; }
+        if (t === "solo" || t === "multiplayer") { setSelectionMode(t); setTab("library"); return; }
+        setSelectionMode("choose"); setTab(t as Tab);
+      }} openQuiz={setSheetQuiz} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
+      case "library": return <Library categories={cfg.categories} openQuiz={q => {
+        if (selectionMode === "solo") { setTalk(false); setSoloId(q.id); setSelectionMode("choose"); return; }
+        if (selectionMode === "multiplayer") { socketRef.current?.emit("room:create", { quizId: q.id, count }); setSelectionMode("choose"); return; }
+        setSheetQuiz(q);
+      }} onCreate={() => setDraft(newDraft())} refreshKey={libKey} />;
       case "board": return <Board me={user} />;
       case "profile": return <Profile user={user} onSave={setUser} onLogout={logout} />;
       default: return null;
@@ -128,7 +150,7 @@ export default function App() {
       {nav && (
         <nav className="tabbar">
           {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["ai", MessageCircle, "AI suhbat"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
-            <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => (id === "create" ? setDraft(newDraft()) : setTab(id))}>
+            <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => { if (id === "create") setDraft(newDraft()); else { setSelectionMode("choose"); setTab(id); } }}>
               <span className={id === "create" ? "plus-btn" : ""}><I size={id === "create" ? 22 : 20} /></span><small>{label}</small>
             </button>
           ))}
@@ -141,10 +163,15 @@ export default function App() {
             <small className="muted">{sheetQuiz.category} · {sheetQuiz.count} savol · {sheetQuiz.plays} marta o‘ynalgan · Muallif: {sheetQuiz.owner}</small>
             <div className="stack"><small className="muted">🔀 Savollar har safar tasodifiy aralashadi. Nechta savol bo‘lsin?</small>
               <div className="chips">{[0, 20, 25, 30].filter(n => n === 0 || n < sheetQuiz.count).map(n => <button key={n} className={count === n ? "on" : ""} onClick={() => setCount(n)}>{n === 0 ? `Hammasi (${sheetQuiz.count})` : `${n} ta`}</button>)}</div></div>
-            <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>
-            <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>
-            <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>
-            {mine && <div className="row gap"><button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button><button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button></div>}
+            {selectionMode === "choose" && <>
+              <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>
+              <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>
+              <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>
+            </>}
+            <div className="row gap">
+              {mine && <button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button>}
+              {canDeleteQuizzes && <button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button>}
+            </div>
           </div>
         )}
       </Sheet>

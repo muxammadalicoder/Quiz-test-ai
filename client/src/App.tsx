@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home as HomeIcon, Library as LibIcon, Plus, ShieldCheck, Trophy, User as UserIcon } from "lucide-react";
+import { Home as HomeIcon, Library as LibIcon, Plus, ShieldCheck, Trophy, User as UserIcon, MessageCircle } from "lucide-react";
 import { Config, QuizCard, User, api, connectSocket, getToken, inTelegram, setAuthFailHandler, setToken, tg } from "./api";
 import { Avatar, Sheet } from "./ui";
 import { Board, Home, Library, Profile } from "./Screens";
 import Editor, { Draft, newDraft } from "./Editor";
 import Solo from "./Solo";
 import Room, { RoomState } from "./Room";
+import Chat from "./Chat";
 
-type Tab = "home" | "library" | "create" | "board" | "profile";
+type Tab = "home" | "library" | "create" | "board" | "profile" | "ai";
 type Boot = "loading" | "ready" | "login" | "tgonly";
 
 export default function App() {
@@ -105,6 +106,7 @@ export default function App() {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
     if (soloId) return <Solo quizId={soloId} count={count} talk={talk} ai={!!cfg.ai} onExit={() => setSoloId("")} onUser={setUser} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
+    if (tab === "ai") return <Chat onExit={() => setTab("home")} />;
     switch (tab) {
       case "home": return <Home user={user} go={t => (t === "create" ? setDraft(newDraft()) : setTab(t as Tab))} openQuiz={setSheetQuiz} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
       case "library": return <Library categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} refreshKey={libKey} />;
@@ -125,7 +127,7 @@ export default function App() {
       <main><AnimatePresence mode="wait"><motion.div key={room ? "room" : soloId ? "solo" : draft ? "edit" : tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>{view()}</motion.div></AnimatePresence></main>
       {nav && (
         <nav className="tabbar">
-          {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
+          {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["ai", MessageCircle, "AI suhbat"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
             <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => (id === "create" ? setDraft(newDraft()) : setTab(id))}>
               <span className={id === "create" ? "plus-btn" : ""}><I size={id === "create" ? 22 : 20} /></span><small>{label}</small>
             </button>

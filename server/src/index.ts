@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { randomInt } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached, chatReply } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -258,6 +258,19 @@ app.post("/api/ai/tts", auth, limit(40, 60000), async (req, res) => {
   const audio = await tts(text);
   if (!audio) return res.status(502).json({ error: "Ovoz yaratilmadi." });
   res.json({ audio });
+});
+app.post("/api/ai/chat", auth, limit(20, 60000), async (req, res) => {
+  if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq. Serverda GEMINI_API_KEY sozlamasini tekshiring." });
+  const text = clean(req.body?.text, 2000);
+  const audio = typeof req.body?.audio === "string" ? req.body.audio : "";
+  const mime = String(req.body?.mime || "audio/webm").split(";")[0].trim().toLowerCase();
+  const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((m: any) => ({ role: String(m?.role || "user"), text: clean(m?.text, 1200) })) : [];
+  if (!text && !audio) return res.status(400).json({ error: "Xabar matni yoki ovoz yozuvi kerak." });
+  if (audio && (audio.length > 900000 || !["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/aac"].includes(mime))) return res.status(400).json({ error: "Ovoz formati qo‘llab-quvvatlanmaydi. Qayta yozib ko‘ring." });
+  if (!aiAllowed(me(req).id, "explain")) return res.status(429).json({ error: "AI so‘rov limiti tugadi. Keyinroq urinib ko‘ring." });
+  const reply = await chatReply({ text, audioB64: audio || undefined, mime, history });
+  if (!reply) return res.status(502).json({ error: "AI javob bera olmadi. API kaliti, model va limitlarni tekshiring." });
+  res.json({ text: reply });
 });
 app.post("/api/ai/listen", auth, limit(40, 60000), async (req, res) => {
   if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq." });

@@ -47,21 +47,14 @@ async function speakServer(text: string): Promise<boolean> {
 /** Matnni o'qiydi; o'qish tugagach (yoki xato/uzoq kutilsa) hal bo'ladi. */
 export async function speak(text: string, server = false): Promise<void> {
   if (!text) return;
-  if (server) {
-    const ok = await speakServer(text);
-    // If Gemini TTS fails, never switch silently to Turkish/browser speech.
-    // This avoids the exact wrong-language voice reported by the user.
-    if (!ok) return;
-    return;
-  }
+  if (server && await speakServer(text)) return;
   return new Promise(resolve => {
     if (!canSpeak) return resolve();
     try {
       stopSpeak();
       const u = new w.SpeechSynthesisUtterance(text) as SpeechSynthesisUtterance;
       const { voice } = pickVoice();
-      if (voice) { u.voice = voice; u.lang = voice.lang; }
-      else u.lang = "uz-UZ";
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = "tr-TR";
       u.rate = 0.95;
       const done = () => { clearTimeout(guard); resolve(); };
       const guard = setTimeout(done, Math.min(30000, 3000 + text.length * 90));

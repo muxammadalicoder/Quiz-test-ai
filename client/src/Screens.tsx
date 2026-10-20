@@ -14,7 +14,7 @@ export function QuizItem({ q, onOpen, mine }: { q: QuizCard; onOpen: () => void;
   return (
     <motion.button whileTap={{ scale: .98 }} className="qitem" onClick={onOpen}>
       <span className="qi-icon">{q.isPublic ? "📚" : <Lock size={18} />}</span>
-      <span className="qi-body"><b>{q.title}</b><small>{q.category} · {q.count} savol · Muallif: {q.owner}{mine ? ` · ${q.isPublic ? "Ommaviy" : "Shaxsiy"}` : ""}</small></span>
+      <span className="qi-body"><b>{q.title}</b><small>{q.category} · {q.count} savol · {mine ? (q.isPublic ? "Ommaviy" : "Shaxsiy") : q.owner}</small></span>
       <span className="qi-plays"><Flame size={13} />{q.plays}</span>
     </motion.button>
   );
@@ -39,8 +39,8 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
         </div>
       </div>
       <div className="grid2">
-        <button className="tile t-purple" onClick={() => go("multiplayer")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
-        <button className="tile t-cyan" onClick={() => go("solo")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
+        <button className="tile t-purple" onClick={() => go("library")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
+        <button className="tile t-cyan" onClick={() => go("library")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
         <button className="tile t-orange" onClick={() => go("create")}><Plus size={24} /><b>Test yaratish</b><small>O‘z savollaringizni yozing</small></button>
         <button className="tile t-green" onClick={() => go("board")}><Users size={24} /><b>Reyting</b><small>Eng kuchli o‘yinchilar</small></button>
       </div>

@@ -14,7 +14,7 @@ export type RoomState = {
 };
 const LETTERS = ["A", "B", "C", "D"];
 
-export default function Room({ s, userId, socket, bot, reactions, onExit }: { s: RoomState; userId: string; socket: Socket; bot?: string; reactions: string[]; onExit: () => void }) {
+export default function Room({ s, userId, socket, bot, reactions }: { s: RoomState; userId: string; socket: Socket; bot?: string; reactions: string[] }) {
   const isHost = s.hostId === userId;
   const left = useCountdown(s.endsAt, s.now);
   const [floats, setFloats] = useState<{ id: string; emoji: string; x: number }[]>([]);
@@ -38,7 +38,6 @@ export default function Room({ s, userId, socket, bot, reactions, onExit }: { s:
     if (link && tg?.openTelegramLink) tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
     else { navigator.clipboard?.writeText(link || s.code); setCopied(true); setTimeout(() => setCopied(false), 1500); }
   };
-  const leaveRoom = () => { socket.emit("room:leave"); onExit(); };
   const endGame = async () => {
     const ok = tg?.showConfirm ? await new Promise<boolean>(r => tg.showConfirm("Testni hamma uchun yakunlaysizmi? Natijalar hozirgi ballar bo‘yicha chiqadi.", r)) : confirm("Testni hamma uchun yakunlaysizmi?");
     if (ok) socket.emit("game:end");
@@ -58,7 +57,7 @@ export default function Room({ s, userId, socket, bot, reactions, onExit }: { s:
       {s.status === "lobby" && (
         <div className="stack">
           <div className="row between">
-            <button className="ghost sm" onClick={leaveRoom}><LogOut size={15} /> Chiqish</button>
+            <button className="ghost sm" onClick={() => socket.emit("room:leave")}><LogOut size={15} /> Chiqish</button>
             <span className="pill"><Users size={13} /> {s.players.length}</span>
           </div>
           <div className="code-card">
@@ -161,7 +160,7 @@ export default function Room({ s, userId, socket, bot, reactions, onExit }: { s:
           </div>
           <Review items={s.review} />
           {reactBar}
-          <button className="primary lg" onClick={leaveRoom}>Bosh sahifaga qaytish</button>
+          <button className="primary lg" onClick={() => socket.emit("room:leave")}>Bosh sahifaga qaytish</button>
         </div>
       )}
     </div>

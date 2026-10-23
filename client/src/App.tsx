@@ -140,12 +140,12 @@ export default function App() {
           <div className="stack">
             <p className="muted">{sheetQuiz.description || "Tavsif yo‘q"}</p>
             <small className="muted">{sheetQuiz.category} · {sheetQuiz.count} savol · {sheetQuiz.plays} marta o‘ynalgan · Muallif: {sheetQuiz.owner}</small>
-            <div className="stack"><small className="muted">🔀 Savollar har safar tasodifiy aralashadi. Nechta savol bo‘lsin?</small>
-              <div className="chips">{[0, 20, 25, 30].filter(n => n === 0 || n < sheetQuiz.count).map(n => <button key={n} className={count === n ? "on" : ""} onClick={() => setCount(n)}>{n === 0 ? `Hammasi (${sheetQuiz.count})` : `${n} ta`}</button>)}</div></div>
-            {mode !== "room" && <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>}
-            {mode !== "room" && <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>}
-            {mode !== "solo" && <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>}
-            <div className="row gap">{mine && <button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button>}<button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button></div>
+            {mode !== "any" && <div className="stack"><small className="muted">🔀 Savollar har safar tasodifiy aralashadi. Nechta savol bo‘lsin?</small>
+              <div className="chips">{[0, 20, 25, 30].filter(n => n === 0 || n < sheetQuiz.count).map(n => <button key={n} className={count === n ? "on" : ""} onClick={() => setCount(n)}>{n === 0 ? `Hammasi (${sheetQuiz.count})` : `${n} ta`}</button>)}</div></div>}
+            {mode === "solo" && <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>}
+            {mode === "solo" && <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>}
+            {mode === "room" && <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>}
+            {mode === "any" && <div className="row gap">{mine && <button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button>}<button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button></div>}
           </div>
         )}
       </Sheet>

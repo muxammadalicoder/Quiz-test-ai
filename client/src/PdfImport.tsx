@@ -49,7 +49,7 @@ export default function PdfImport({ categories, onCancel, onDone }: { categories
       <input type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" onChange={e => { setFile(e.target.files?.[0] || null); setParsed(null); setError(""); }} />
       {file && <small className="muted">Tanlandi: {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</small>}
       <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> Gemini tahlil qilmoqda…</> : <><Upload size={17}/> Faylni tahlil qilish</>}</button>
-      <small className="muted">Tahlil qilish uchun serverda GEMINI_API_KEY sozlangan bo‘lishi kerak.</small>
+      <small className="muted">Yuklash biroz vaqt olishi mumkin.Sabr qiling🤌.</small>
     </div>
     {error && <p className="err">{error}</p>}
     {parsed && <>

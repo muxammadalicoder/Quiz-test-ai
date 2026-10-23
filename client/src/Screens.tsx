@@ -14,7 +14,7 @@ export function QuizItem({ q, onOpen, mine }: { q: QuizCard; onOpen: () => void;
   return (
     <motion.button whileTap={{ scale: .98 }} className="qitem" onClick={onOpen}>
       <span className="qi-icon">{q.isPublic ? "📚" : <Lock size={18} />}</span>
-      <span className="qi-body"><b>{q.title}</b><small>{q.category} · {q.count} savol · {mine ? (q.isPublic ? "Ommaviy" : "Shaxsiy") : q.owner}</small></span>
+      <span className="qi-body"><b>{q.title}</b><small>{q.category} · {q.count} savol · {mine ? (q.isPublic ? "Ommaviy" : "Shaxsiy") : `👤 ${q.owner}`}</small></span>
       <span className="qi-plays"><Flame size={13} />{q.plays}</span>
     </motion.button>
   );
@@ -39,8 +39,8 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
         </div>
       </div>
       <div className="grid2">
-        <button className="tile t-purple" onClick={() => go("library")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
-        <button className="tile t-cyan" onClick={() => go("library")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
+        <button className="tile t-purple" onClick={() => go("room")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
+        <button className="tile t-cyan" onClick={() => go("solo")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
         <button className="tile t-orange" onClick={() => go("create")}><Plus size={24} /><b>Test yaratish</b><small>O‘z savollaringizni yozing</small></button>
         <button className="tile t-green" onClick={() => go("board")}><Users size={24} /><b>Reyting</b><small>Eng kuchli o‘yinchilar</small></button>
       </div>
@@ -50,7 +50,7 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
   );
 }
 
-export function Library({ categories, openQuiz, onCreate, refreshKey }: { categories: string[]; openQuiz: (q: QuizCard) => void; onCreate: () => void; refreshKey: number }) {
+export function Library({ mode, categories, openQuiz, onCreate, refreshKey }: { mode: "any" | "room" | "solo"; categories: string[]; openQuiz: (q: QuizCard) => void; onCreate: () => void; refreshKey: number }) {
   const [scope, setScope] = useState<"public" | "mine">("public"); const [q, setQ] = useState(""); const [cat, setCat] = useState("");
   const [list, setList] = useState<QuizCard[] | null>(null);
   useEffect(() => {
@@ -60,7 +60,8 @@ export function Library({ categories, openQuiz, onCreate, refreshKey }: { catego
   const shown = (list || []).filter(x => !cat || x.category === cat);
   return (
     <div className="stack">
-      <h1 className="h1">Testlar</h1>
+      <h1 className="h1">{mode === "room" ? "⚔️ Ommaviy o‘yin" : mode === "solo" ? "🎯 Yakka o‘yin" : "Testlar"}</h1>
+      {mode !== "any" && <small className="muted">Test tanlang — {mode === "room" ? "xona shu test bilan ochiladi" : "o‘yin shu test bilan boshlanadi"}.</small>}
       <div className="seg"><button className={scope === "public" ? "on" : ""} onClick={() => setScope("public")}>🌍 Ommaviy</button><button className={scope === "mine" ? "on" : ""} onClick={() => setScope("mine")}>📁 Mening testlarim</button></div>
       <div className="search"><Search size={16} /><input placeholder="Test qidirish…" value={q} onChange={e => setQ(e.target.value)} /></div>
       <div className="chips"><button className={!cat ? "on" : ""} onClick={() => setCat("")}>Hammasi</button>{categories.map(c => <button key={c} className={cat === c ? "on" : ""} onClick={() => setCat(c)}>{c}</button>)}</div>

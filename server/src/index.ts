@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from "express";
 import multer from "multer";
+import mammoth from "mammoth";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
@@ -9,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizPdf, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizPdf, parseQuizDocxText, tts, ttsCached } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -149,19 +150,26 @@ app.get("/api/quizzes/:id", auth, (req, res) => {
   res.json({ quiz: q.ownerId === me(req).id ? { ...quizCard(q), questions: q.questions } : quizCard(q) });
 });
 const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, cb) => {
-  if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) cb(null, true);
-  else cb(new Error("Faqat PDF formatdagi fayl yuklang."));
+  if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf") || file.originalname.toLowerCase().endsWith(".docx")) cb(null, true);
+  else cb(new Error("Faqat PDF yoki DOCX formatdagi fayl yuklang."));
 } });
 app.post("/api/quizzes/import-pdf", auth, limit(5, 60 * 60 * 1000), (req, res, next) => {
   pdfUpload.single("pdf")(req, res, async err => {
-    if (err) return res.status(400).json({ error: err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE" ? "PDF hajmi 15 MB dan oshmasin." : err.message || "PDF yuklanmadi." });
+    if (err) return res.status(400).json({ error: err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE" ? "Fayl hajmi 15 MB dan oshmasin." : err.message || "PDF yuklanmadi." });
     try {
       if (!aiEnabled) return res.status(503).json({ error: "Gemini AI sozlanmagan. Serverda GEMINI_API_KEY kerak." });
       const file = (req as Request & { file?: Express.Multer.File }).file;
-      if (!file) return res.status(400).json({ error: "PDF faylni tanlang." });
+      if (!file) return res.status(400).json({ error: "PDF yoki DOCX faylni tanlang." });
       if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "PDF tahlil qilish limiti tugadi yoki Gemini sozlanmagan." });
-      const parsed = await parseQuizPdf(file.buffer);
-      if (!parsed) return res.status(502).json({ error: "Gemini PDFdan testlarni ajrata olmadi. PDF matnli ekanini tekshirib, qayta urinib ko‘ring." });
+      const isDocx = file.originalname.toLowerCase().endsWith(".docx");
+      let parsed;
+      if (isDocx) {
+        const extracted = await mammoth.extractRawText({ buffer: file.buffer });
+        parsed = await parseQuizDocxText(extracted.value);
+      } else {
+        parsed = await parseQuizPdf(file.buffer);
+      }
+      if (!parsed) return res.status(502).json({ error: `Gemini ${isDocx ? "DOCX" : "PDF"} faylidan testlarni ajrata olmadi. Fayl ichida matnli savollar borligini tekshirib, qayta urinib ko‘ring.` });
       res.json({ quiz: parsed, warning: "AI javoblari xato bo‘lishi mumkin. Saqlashdan oldin har bir to‘g‘ri javobni tekshiring." });
     } catch (e) { next(e); }
   });

@@ -144,3 +144,23 @@ export async function parseQuizPdf(pdf: Buffer): Promise<PdfQuizResult | null> {
     return { title: String(j.title || "PDF testlari").trim().slice(0, 60) || "PDF testlari", description: "PDFdan AI yordamida ajratildi. Saqlashdan oldin javoblarni tekshiring.", category: "Boshqa", questions };
   } catch (e) { console.error("PDF test JSON xatosi:", String(e)); return null; }
 }
+
+
+/** DOCX dan ajratilgan matnni Gemini orqali testlarga aylantiradi. */
+export async function parseQuizDocxText(docxText: string): Promise<PdfQuizResult | null> {
+  if (!KEY || !docxText.trim()) return null;
+  const system = `Sen hujjatdagi testlar to'plamini tahlil qiladigan test tuzuvchisan. Matnni boshidan oxirigacha tahlil qil. Javoblar kaliti yoki savollar yonidagi belgilangan javoblar bo'lsa, ularni savollar bilan moslashtir. Rasmiy kalit bo'lmasa, savollarni bilim asosida yech. Faqat hujjatda bor savollar va variantlarni ol, yangi savol yoki variant to'qima. Har savolda 2-4 ta variant bo'lsin. correct — to'g'ri variantning 0 dan boshlanuvchi indeksi. Javobni aniqlab bo'lmasa ham savolni tashlab ketma, eng ehtimoliy javobni tanla. Takroriy savollarni saqla. 200 tagacha savol qaytar. Faqat sof JSON qaytar: {"title":"Hujjatdan olingan test nomi","description":"DOCXdan Gemini AI yordamida ajratildi","category":"Boshqa","questions":[{"text":"savol","options":["A","B","C","D"],"correct":0,"time":20}]}.`;
+  const out = await generate(system, [{ text: `Quyidagi DOCX hujjatidan testlarni ajrat. Javoblar kalitini tekshir va correct indeksini belgila. Matn:\n\n${docxText.slice(0, 100000)}` }], true, 30000, 150000);
+  if (!out) return null;
+  try {
+    const j = JSON.parse(out.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim());
+    if (!Array.isArray(j.questions)) return null;
+    const questions: PdfQuestion[] = j.questions.slice(0, 200).map((q: any) => {
+      const options = Array.isArray(q.options) ? q.options.map((x: unknown) => String(x ?? "").trim()).filter(Boolean).slice(0, 4) : [];
+      const correct = Number(q.correct);
+      return { text: String(q.text ?? "").trim().slice(0, 200), options, correct, time: 20 };
+    }).filter((q: PdfQuestion) => q.text.length > 0 && q.options.length >= 2 && Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.options.length);
+    if (!questions.length) return null;
+    return { title: String(j.title || "DOCX testlari").trim().slice(0, 60) || "DOCX testlari", description: "DOCXdan AI yordamida ajratildi. Saqlashdan oldin javoblarni tekshiring.", category: "Boshqa", questions };
+  } catch (e) { console.error("DOCX test JSON xatosi:", String(e)); return null; }
+}

@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
@@ -8,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizPdf, tts, ttsCached } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -79,8 +80,8 @@ function validateQuiz(body: any): { ok: true; data: Pick<Quiz, "title" | "descri
   const title = clean(body?.title, 60), description = clean(body?.description, 140);
   const category = CATEGORIES.includes(body?.category) ? body.category : "Boshqa";
   if (title.length < 3) return { ok: false, error: "Test nomi kamida 3 belgi bo‘lsin." };
-  if (!Array.isArray(body?.questions) || body.questions.length < 1 || body.questions.length > 50)
-    return { ok: false, error: "Testda 1 tadan 50 tagacha savol bo‘lishi kerak." };
+  if (!Array.isArray(body?.questions) || body.questions.length < 1 || body.questions.length > 200)
+    return { ok: false, error: "Testda 1 tadan 200 tagacha savol bo‘lishi kerak." };
   const questions: Question[] = [];
   for (const [i, q] of body.questions.entries()) {
     const text = clean(q?.text, 200);
@@ -147,6 +148,25 @@ app.get("/api/quizzes/:id", auth, (req, res) => {
   if (!q || (!q.isPublic && q.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   res.json({ quiz: q.ownerId === me(req).id ? { ...quizCard(q), questions: q.questions } : quizCard(q) });
 });
+const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, cb) => {
+  if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) cb(null, true);
+  else cb(new Error("Faqat PDF formatdagi fayl yuklang."));
+} });
+app.post("/api/quizzes/import-pdf", auth, limit(5, 60 * 60 * 1000), (req, res, next) => {
+  pdfUpload.single("pdf")(req, res, async err => {
+    if (err) return res.status(400).json({ error: err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE" ? "PDF hajmi 15 MB dan oshmasin." : err.message || "PDF yuklanmadi." });
+    try {
+      if (!aiEnabled) return res.status(503).json({ error: "Gemini AI sozlanmagan. Serverda GEMINI_API_KEY kerak." });
+      const file = (req as Request & { file?: Express.Multer.File }).file;
+      if (!file) return res.status(400).json({ error: "PDF faylni tanlang." });
+      if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "PDF tahlil qilish limiti tugadi yoki Gemini sozlanmagan." });
+      const parsed = await parseQuizPdf(file.buffer);
+      if (!parsed) return res.status(502).json({ error: "Gemini PDFdan testlarni ajrata olmadi. PDF matnli ekanini tekshirib, qayta urinib ko‘ring." });
+      res.json({ quiz: parsed, warning: "AI javoblari xato bo‘lishi mumkin. Saqlashdan oldin har bir to‘g‘ri javobni tekshiring." });
+    } catch (e) { next(e); }
+  });
+});
+
 app.post("/api/quizzes", auth, limit(20, 60000), (req, res) => {
   const v = validateQuiz(req.body);
   if (!v.ok) return res.status(400).json({ error: v.error });

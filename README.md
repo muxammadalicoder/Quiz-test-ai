@@ -31,3 +31,21 @@ npm install
 npm run dev   # http://localhost:5173 (BOT_TOKEN bo‘lmasa mehmon sifatida kirish yoqiladi)
 ```
 Tekshirish: `npm run typecheck -w server` va `npm run typecheck -w client`.
+
+
+## PDF orqali test import qilish
+
+`Testlar` bo'limidagi **PDF orqali test yuklash (Gemini AI)** tugmasi yordamida telefon yoki kompyuterdan PDF yuklash mumkin. Server Gemini orqali savollar va javob variantlarini ajratadi, natijani tekshirish uchun ko'rsatadi va foydalanuvchi tasdiqlagandan keyin test sifatida saqlaydi. Bir PDF 15 MB gacha, bitta test esa 200 tagacha savolni qo'llab-quvvatlaydi.
+
+- Render/server muhitida `GEMINI_API_KEY` sozlangan bo'lishi kerak.
+- `AI_PDF_DAILY` bir foydalanuvchi uchun kunlik PDF tahlil limitini belgilaydi (standart: 5).
+- Gemini noto'g'ri javobni belgilashi mumkin; saqlashdan oldin ko'rsatilgan javoblarni tekshiring.
+- PDF import qilish endpointi: `POST /api/quizzes/import-pdf` (multipart form-data, `pdf` maydoni).
+
+## PDF orqali Gemini AI bilan test import qilish
+
+`Testlar` bo'limidagi **PDF orqali test qo'shish** funksiyasi PDF faylni serverga yuboradi. Serverdagi `GEMINI_API_KEY` orqali Gemini PDFning barcha sahifalarini, savollarni, variantlarni va mavjud bo'lsa hujjat oxiridagi javoblar kalitini tahlil qiladi. Javoblar kalitidagi belgilar savollarga moslanadi; kalit yo'q bo'lsa, Gemini savolni bilim asosida yechishga harakat qiladi. Har bir savolning `correct` maydoni to'g'ri variant indeksini belgilaydi.
+
+Gemini natijasi avval ko'rib chiqish oynasida chiqadi. Javoblar indeksini tekshirish/o'zgartirish mumkin; **Testlarga saqlash** bosilgandan keyingina test ilovaga qo'shiladi. Bu mavjud testlar va o'yinlarni tasodifan o'zgartirmaslik uchun ataylab saqlangan tasdiqlash bosqichidir. Yuklash limiti 15 MB, bitta PDFdan 200 tagacha savol.
+
+Render muhitida `GEMINI_API_KEY` o'rnatilgan bo'lishi shart. AI javoblari mutlaq kafolatli emas; ayniqsa PDFda javoblar kaliti bo'lmasa, saqlashdan oldin natijani tekshiring.

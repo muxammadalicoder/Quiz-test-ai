@@ -5,7 +5,7 @@ import { Server, Socket } from "socket.io";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
 import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
@@ -163,9 +163,15 @@ app.put("/api/quizzes/:id", auth, limit(30, 60000), (req, res) => {
   Object.assign(q, v.data); save();
   res.json({ quiz: quizCard(q) });
 });
-app.delete("/api/quizzes/:id", auth, (req, res) => {
+// Testni faqat maxsus parol biladigan admin o'chira oladi (parol Render'dagi ADMIN_PASSWORD o'zgaruvchisida)
+const sha = (x: string) => createHash("sha256").update(x).digest();
+app.delete("/api/quizzes/:id", auth, limit(6, 60000), (req, res) => {
+  const adminPass = process.env.ADMIN_PASSWORD || "";
+  if (!adminPass) return res.status(503).json({ error: "O‘chirish yoqilmagan: serverda ADMIN_PASSWORD o‘rnatilmagan." });
+  const given = typeof req.body?.password === "string" ? req.body.password.slice(0, 100) : "";
+  if (!timingSafeEqual(sha(given), sha(adminPass))) return res.status(403).json({ error: "Parol noto‘g‘ri." });
   const q = quizzes()[req.params.id];
-  if (!q || q.ownerId !== me(req).id) return res.status(404).json({ error: "Test topilmadi." });
+  if (!q) return res.status(404).json({ error: "Test topilmadi." });
   delete quizzes()[q.id]; save(); res.json({ ok: true });
 });
 app.get("/api/leaderboard", auth, (_req, res) => {

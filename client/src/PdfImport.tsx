@@ -15,13 +15,13 @@ export default function PdfImport({ categories, onCancel, onDone }: { categories
   const [showAll, setShowAll] = useState(false);
 
   async function analyze() {
-    if (!file) { setError("Avval PDF faylni tanlang."); return; }
+    if (!file) { setError("Avval PDF yoki DOCX faylni tanlang."); return; }
     setBusy(true); setError(""); setParsed(null); setWarning("");
     try {
       const form = new FormData(); form.append("pdf", file);
       const response = await fetch(`${SERVER}/api/quizzes/import-pdf`, { method: "POST", headers: { Authorization: `Bearer ${getToken()}` }, body: form });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "PDF tahlil qilinmadi.");
+      if (!response.ok) throw new Error(data.error || "Fayl tahlil qilinmadi.");
       setParsed(data.quiz); setWarning(data.warning || "");
     } catch (e: any) { setError(e.message || "Internetga ulanishda xatolik."); }
     finally { setBusy(false); }
@@ -43,13 +43,13 @@ export default function PdfImport({ categories, onCancel, onDone }: { categories
   }
 
   return <div className="stack">
-    <div className="row between"><h1 className="h1">PDF orqali test qo‘shish</h1><button className="icon-btn" onClick={onCancel} aria-label="Yopish"><X size={18}/></button></div>
+    <div className="row between"><h1 className="h1">PDF yoki DOCX orqali test qo‘shish</h1><button className="icon-btn" onClick={onCancel} aria-label="Yopish"><X size={18}/></button></div>
     <div className="card stack">
-      <div className="row gap"><FileUp size={25}/><div className="grow"><b>PDF faylni yuklang</b><small className="muted block">Telefon yoki kompyuterdan · 15 MB gacha · 200 tagacha savol</small></div></div>
-      <input type="file" accept="application/pdf,.pdf" onChange={e => { setFile(e.target.files?.[0] || null); setParsed(null); setError(""); }} />
+      <div className="row gap"><FileUp size={25}/><div className="grow"><b>PDF yoki DOCX faylni yuklang</b><small className="muted block">Telefon yoki kompyuterdan · 15 MB gacha · 200 tagacha savol</small></div></div>
+      <input type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" onChange={e => { setFile(e.target.files?.[0] || null); setParsed(null); setError(""); }} />
       {file && <small className="muted">Tanlandi: {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</small>}
-      <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> Gemini tahlil qilmoqda…</> : <><Upload size={17}/> PDFni tahlil qilish</>}</button>
-      <small className="muted">Yuborilgan faylni Gemini tahlil qiladi va javoblarni belgilaydi.</small>
+      <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> Gemini tahlil qilmoqda…</> : <><Upload size={17}/> Faylni tahlil qilish</>}</button>
+      <small className="muted">Tahlil qilish uchun serverda GEMINI_API_KEY sozlangan bo‘lishi kerak.</small>
     </div>
     {error && <p className="err">{error}</p>}
     {parsed && <>

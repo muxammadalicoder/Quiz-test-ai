@@ -6,6 +6,7 @@ import { Config, QuizCard, User, api, connectSocket, getToken, inTelegram, setAu
 import { Avatar, Sheet } from "./ui";
 import { Board, Home, Library, Profile } from "./Screens";
 import Editor, { Draft, newDraft } from "./Editor";
+import PdfImport from "./PdfImport";
 import Solo from "./Solo";
 import Room, { RoomState } from "./Room";
 
@@ -22,6 +23,7 @@ export default function App() {
   const [sheetQuiz, setSheetQuiz] = useState<QuizCard | null>(null);
   const [soloId, setSoloId] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [pdfImport, setPdfImport] = useState(false);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
   const [libKey, setLibKey] = useState(0);
@@ -70,10 +72,10 @@ export default function App() {
   // Telegram "orqaga" tugmasi
   useEffect(() => {
     const bb = tg?.BackButton; if (!bb) return;
-    const back = () => { if (soloId) setSoloId(""); else if (draft) setDraft(null); else if (tab !== "home") setTab("home"); };
-    const show = !room && (soloId || draft || tab !== "home");
+    const back = () => { if (soloId) setSoloId(""); else if (draft) setDraft(null); else if (pdfImport) setPdfImport(false); else if (tab !== "home") setTab("home"); };
+    const show = !room && (soloId || draft || pdfImport || tab !== "home");
     show ? bb.show() : bb.hide(); bb.onClick(back); return () => bb.offClick(back);
-  }, [soloId, draft, tab, room]);
+  }, [soloId, draft, pdfImport, tab, room]);
 
   async function guestLogin() {
     try { const d = await api("/api/auth/guest", { auth: false, body: { name: guestName } }); setToken(d.token); setUser(d.user); setBoot("ready"); } catch (e: any) { say(e.message, true); }
@@ -107,16 +109,17 @@ export default function App() {
   const view = () => {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
     if (soloId) return <Solo quizId={soloId} count={count} talk={talk} ai={!!cfg.ai} onExit={() => setSoloId("")} onUser={setUser} />;
+    if (pdfImport) return <PdfImport categories={cfg.categories} onCancel={() => setPdfImport(false)} onDone={() => { setPdfImport(false); setTab("library"); setLibKey(k => k + 1); say("PDF testlari saqlandi ✓"); }} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     switch (tab) {
       case "home": return <Home user={user} go={t => { if (t === "create") setDraft(newDraft()); else if (t === "room" || t === "solo") { setMode(t); setTab("library"); } else { setMode("any"); setTab(t as Tab); } }} openQuiz={q => { setMode("any"); setSheetQuiz(q); }} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
-      case "library": return <Library mode={mode} categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} refreshKey={libKey} />;
+      case "library": return <Library mode={mode} categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} onImportPdf={() => setPdfImport(true)} refreshKey={libKey} />;
       case "board": return <Board me={user} />;
       case "profile": return <Profile user={user} onSave={setUser} onLogout={logout} />;
       default: return null;
     }
   };
-  const nav = !room && !soloId && !draft;
+  const nav = !room && !soloId && !draft && !pdfImport;
   const mine = sheetQuiz && sheetQuiz.ownerId === user.id;
 
   return (
@@ -125,7 +128,7 @@ export default function App() {
       {!room && !soloId && !draft && (
         <header className="top"><div className="brand">🎯 Quiz<b>Arena</b></div><span className="online"><i />{online} onlayn</span><button className="chip-user" onClick={() => setTab("profile")}><Avatar id={user.avatar} size={30} /><span>{user.xp} XP</span></button></header>
       )}
-      <main><AnimatePresence mode="wait"><motion.div key={room ? "room" : soloId ? "solo" : draft ? "edit" : tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>{view()}</motion.div></AnimatePresence></main>
+      <main><AnimatePresence mode="wait"><motion.div key={room ? "room" : soloId ? "solo" : pdfImport ? "pdf-import" : draft ? "edit" : tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>{view()}</motion.div></AnimatePresence></main>
       {nav && (
         <nav className="tabbar">
           {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (

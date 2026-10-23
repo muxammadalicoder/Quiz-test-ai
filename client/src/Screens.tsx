@@ -50,7 +50,7 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
   );
 }
 
-export function Library({ mode, categories, openQuiz, onCreate, refreshKey }: { mode: "any" | "room" | "solo"; categories: string[]; openQuiz: (q: QuizCard) => void; onCreate: () => void; refreshKey: number }) {
+export function Library({ mode, categories, openQuiz, onCreate, onImportPdf, refreshKey }: { mode: "any" | "room" | "solo"; categories: string[]; openQuiz: (q: QuizCard) => void; onCreate: () => void; onImportPdf: () => void; refreshKey: number }) {
   const [scope, setScope] = useState<"public" | "mine">("public"); const [q, setQ] = useState(""); const [cat, setCat] = useState("");
   const [list, setList] = useState<QuizCard[] | null>(null);
   useEffect(() => {
@@ -69,6 +69,7 @@ export function Library({ mode, categories, openQuiz, onCreate, refreshKey }: { 
         : shown.length ? shown.map(x => <QuizItem key={x.id} q={x} mine={scope === "mine"} onOpen={() => openQuiz(x)} />)
         : <Empty icon="🗂️" text={scope === "mine" ? "Hali test yaratmagansiz." : "Hech narsa topilmadi."} />}
       {scope === "mine" && <button className="primary" onClick={onCreate}><Plus size={16} /> Yangi test</button>}
+      {mode === "any" && <button className="ghost" onClick={onImportPdf}>📄 PDF orqali test yuklash (Gemini AI)</button>}
     </div>
   );
 }

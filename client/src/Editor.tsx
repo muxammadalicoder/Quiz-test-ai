@@ -57,7 +57,7 @@ export default function Editor({ draft, categories, onDone, onCancel }: { draft:
           </label>
         </div>
       ))}
-      <button className="ghost" disabled={d.questions.length >= 50} onClick={() => setD({ ...d, questions: [...d.questions, blank()] })}><Plus size={16} /> Savol qo‘shish</button>
+      <button className="ghost" disabled={d.questions.length >= 200} onClick={() => setD({ ...d, questions: [...d.questions, blank()] })}><Plus size={16} /> Savol qo‘shish</button>
       {err && <p className="err">{err}</p>}
       <div className="row gap"><button className="ghost grow" onClick={onCancel}>Bekor qilish</button><button className="primary grow" disabled={busy} onClick={save}>{busy ? "Saqlanmoqda…" : "Saqlash"}</button></div>
     </div>

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Check, Mic, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 import { User, api, haptic, tg } from "./api";
 import { Confetti, Review, ReviewItem, TimerBar } from "./ui";
+import { playClick, playCorrect, playFinish, playWrong } from "./sounds";
 import { canListen, canRecord, canSpeak, listen, matchAnswer, pickVoice, speak, startAutoClip, stopListen, stopSpeak, unlockAudio, voiceError } from "./voice";
 
 type Q = { index: number; total: number; text: string; options: string[]; time: number; score: number };
@@ -55,6 +56,8 @@ export default function Solo({ quizId, count, talk = false, ai = false, onExit, 
       stopListen(); setListening(false);
       const r: Res = await api("/api/solo/answer", { body: { sid, index: i, explain: talk } });
       setRes(r); haptic(r.correct ? "success" : "error");
+      if (!talk) (r.correct ? playCorrect : playWrong)();
+      if (r.finished) playFinish();
       if (r.finished) onUser(r.finished.user);
       if (talk) {
         const right = q ? `${LETTERS[r.correctIndex]} variant: ${q.options[r.correctIndex]}` : "";
@@ -166,7 +169,7 @@ export default function Solo({ quizId, count, talk = false, ai = false, onExit, 
         {q.options.map((o, i) => {
           const state = res ? (i === res.correctIndex ? "right" : i === picked ? "wrong" : "dim") : "";
           return (
-            <motion.button key={i} whileTap={{ scale: .96 }} disabled={!!res} className={`ans c${i} ${state}`} onClick={() => submit(i)}>
+            <motion.button key={i} whileTap={{ scale: .96 }} disabled={!!res} className={`ans c${i} ${state}`} onClick={() => { playClick(); submit(i); }}>
               <span>{LETTERS[i]}</span>{o}{state === "right" && <Check size={20} />}{state === "wrong" && <X size={20} />}
             </motion.button>
           );
@@ -179,7 +182,7 @@ export default function Solo({ quizId, count, talk = false, ai = false, onExit, 
               : <><X size={26} /><div><b>{res.timedOut ? "Vaqt tugadi" : "Noto‘g‘ri"}</b><small>To‘g‘ri javob belgilandi</small></div></>}
           </div>
           {res.explanation && <div className="ai-note"><b>🤖 AI izohi</b><p>{res.explanation}</p></div>}
-          <button className="primary lg" disabled={busy} onClick={res.next ? goNext : () => setShowFinal(true)}>{res.next ? "Keyingi savol" : "Natijani ko‘rish"}</button>
+          <button className="primary lg" disabled={busy} onClick={() => { playClick(); if (res.next) goNext(); else { playFinish(); setShowFinal(true); } }}>{res.next ? "Keyingi savol" : "Natijani ko‘rish"}</button>
         </motion.div>
       )}
     </div>

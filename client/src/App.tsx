@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home as HomeIcon, Library as LibIcon, Plus, ShieldCheck, Trophy, User as UserIcon } from "lucide-react";
+import { Home as HomeIcon, Library as LibIcon, Plus, ShieldCheck, Trophy, User as UserIcon, Volume2, VolumeX } from "lucide-react";
 import { Config, QuizCard, User, api, connectSocket, getToken, inTelegram, setAuthFailHandler, setToken, tg } from "./api";
 import { Avatar, Sheet } from "./ui";
 import { Board, Home, Library, Profile } from "./Screens";
@@ -9,6 +9,7 @@ import Editor, { Draft, newDraft } from "./Editor";
 import PdfImport from "./PdfImport";
 import Solo from "./Solo";
 import Room, { RoomState } from "./Room";
+import { playClick, setSoundsEnabled, soundsEnabled } from "./sounds";
 
 type Tab = "home" | "library" | "create" | "board" | "profile";
 type Mode = "any" | "room" | "solo";
@@ -31,6 +32,7 @@ export default function App() {
   const [online, setOnline] = useState(0);
   const [count, setCount] = useState(0);
   const [talk, setTalk] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => soundsEnabled());
   const socketRef = useRef<Socket | null>(null);
 
   const say = useCallback((text: string, bad = false) => { setToast({ text, bad }); setTimeout(() => setToast(null), 3200); }, []);
@@ -124,6 +126,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <button className="sound-toggle" aria-label={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} title={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} onClick={() => { const next = !soundOn; setSoundOn(next); setSoundsEnabled(next); if (next) playClick(); }}>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
       <div className="bg" aria-hidden><i /><i /></div>
       {!room && !soloId && !draft && (
         <header className="top"><div className="brand">🎯 Quiz<b>Arena</b></div><span className="online"><i />{online} onlayn</span><button className="chip-user" onClick={() => setTab("profile")}><Avatar id={user.avatar} size={30} /><span>{user.xp} XP</span></button></header>
@@ -132,7 +135,7 @@ export default function App() {
       {nav && (
         <nav className="tabbar">
           {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
-            <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => { if (id === "create") setDraft(newDraft()); else { if (id === "library") setMode("any"); setTab(id); } }}>
+            <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => { playClick(); if (id === "create") setDraft(newDraft()); else { if (id === "library") setMode("any"); setTab(id); } }}>
               <span className={id === "create" ? "plus-btn" : ""}><I size={id === "create" ? 22 : 20} /></span><small>{label}</small>
             </button>
           ))}

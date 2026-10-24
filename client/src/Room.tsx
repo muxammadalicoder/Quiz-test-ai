@@ -3,6 +3,7 @@ import { Socket } from "socket.io-client";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Crown, LogOut, Play, Send, SkipForward, UserX, Users, WifiOff, X } from "lucide-react";
 import { haptic, tg } from "./api";
+import { playClick, playCorrect, playFinish, playWrong } from "./sounds";
 import { Avatar, Confetti, Podium, Review, ReviewItem, TimerBar, useCountdown } from "./ui";
 
 export type RP = { id: string; name: string; avatar: string; level: number; score: number; streak: number; connected: boolean; answered: boolean; correct?: boolean; points?: number };
@@ -29,7 +30,8 @@ export default function Room({ s, userId, socket, bot, reactions }: { s: RoomSta
   }, [socket]);
 
   useEffect(() => {
-    if (s.status === "results") haptic(s.me?.correct ? "success" : "error");
+    if (s.status === "results") { haptic(s.me?.correct ? "success" : "error"); (s.me?.correct ? playCorrect : playWrong)(); }
+    if (s.status === "finished") playFinish();
   }, [s.status, s.index]);
 
   const link = bot ? `https://t.me/${bot}?startapp=${s.code}` : "";
@@ -99,7 +101,7 @@ export default function Room({ s, userId, socket, bot, reactions }: { s: RoomSta
           ) : (
             <div className="answers">
               {s.question.options.map((o, i) => (
-                <motion.button key={i} whileTap={{ scale: .96 }} className={`ans c${i}`} onClick={() => { haptic("light"); socket.emit("game:answer", { index: i }); }}>
+                <motion.button key={i} whileTap={{ scale: .96 }} className={`ans c${i}`} onClick={() => { playClick(); haptic("light"); socket.emit("game:answer", { index: i }); }}>
                   <span>{LETTERS[i]}</span>{o}
                 </motion.button>
               ))}
@@ -137,7 +139,7 @@ export default function Room({ s, userId, socket, bot, reactions }: { s: RoomSta
               </motion.div>
             ))}
           </div>
-          {isHost ? <button className="primary lg" onClick={() => socket.emit("game:next")}>{s.index + 1 >= s.quiz.total ? "Natijalarni ko‘rsatish 🏆" : "Keyingi savol"}</button>
+          {isHost ? <button className="primary lg" onClick={() => { playClick(); socket.emit("game:next"); }}>{s.index + 1 >= s.quiz.total ? "Natijalarni ko‘rsatish 🏆" : "Keyingi savol"}</button>
             : <div className="waiting"><i className="spinner" /> Boshlovchi davom ettirishini kutyapmiz…</div>}
           {isHost && <button className="ghost sm danger" onClick={endGame}>⏹ Testni yakunlash</button>}
           {reactBar}

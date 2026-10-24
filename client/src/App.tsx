@@ -9,7 +9,7 @@ import Editor, { Draft, newDraft } from "./Editor";
 import PdfImport from "./PdfImport";
 import Solo from "./Solo";
 import Room, { RoomState } from "./Room";
-import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, stopBackgroundMusic } from "./sounds";
+import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, startTestMusic, stopBackgroundMusic } from "./sounds";
 
 type Tab = "home" | "library" | "create" | "board" | "profile";
 type Mode = "any" | "room" | "solo";
@@ -47,6 +47,14 @@ export default function App() {
       stopBackgroundMusic();
     };
   }, []);
+
+  // Xona kutish zalida umumiy kuy, savollar davomida esa test musiqasi.
+  useEffect(() => {
+    if (!room) return;
+    if (room.status === "question" || room.status === "results") startTestMusic();
+    else startBackgroundMusic();
+    return () => { if (room.status === "finished") startBackgroundMusic(); };
+  }, [room?.status]);
 
   const say = useCallback((text: string, bad = false) => { setToast({ text, bad }); setTimeout(() => setToast(null), 3200); }, []);
 
@@ -139,11 +147,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <button className="sound-toggle" aria-label={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} title={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} onClick={() => { const next = !soundOn; setSoundOn(next); setSoundsEnabled(next); if (next) playClick(); }}>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
       <div className="bg" aria-hidden><i /><i /></div>
-      {!room && !soloId && !draft && (
-        <header className="top"><div className="brand">🎯 Quiz<b>Arena</b></div><span className="online"><i />{online} onlayn</span><button className="chip-user" onClick={() => setTab("profile")}><Avatar id={user.avatar} size={30} /><span>{user.xp} XP</span></button></header>
+      {!room && !soloId && !draft && !pdfImport && (
+        <header className="top"><div className="brand">🎯 Quiz<b>Arena</b></div><span className="online"><i />{online} onlayn</span><button className={`sound-toggle in-header ${soundOn ? "is-on" : ""}`} aria-label={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} title={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} onClick={() => { const next = !soundOn; setSoundOn(next); setSoundsEnabled(next); if (next) playClick(); }}>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="chip-user" onClick={() => setTab("profile")}><Avatar id={user.avatar} size={30} /><span>{user.xp} XP</span></button></header>
       )}
+      {(room || soloId || draft || pdfImport) && <button className={`sound-toggle floating ${soundOn ? "is-on" : ""}`} aria-label={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} title={soundOn ? "Ovozlarni o‘chirish" : "Ovozlarni yoqish"} onClick={() => { const next = !soundOn; setSoundOn(next); setSoundsEnabled(next); if (next) playClick(); }}>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>}
       <main><AnimatePresence mode="wait"><motion.div key={room ? "room" : soloId ? "solo" : pdfImport ? "pdf-import" : draft ? "edit" : tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>{view()}</motion.div></AnimatePresence></main>
       {nav && (
         <nav className="tabbar">

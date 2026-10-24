@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Check, Mic, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 import { User, api, haptic, tg } from "./api";
 import { Confetti, Review, ReviewItem, TimerBar } from "./ui";
-import { playClick, playCorrect, playFinish, playWrong } from "./sounds";
+import { playClick, playCorrect, playFinish, playWrong, startTestMusic, startBackgroundMusic } from "./sounds";
 import { canListen, canRecord, canSpeak, listen, matchAnswer, pickVoice, speak, startAutoClip, stopListen, stopSpeak, unlockAudio, voiceError } from "./voice";
 
 type Q = { index: number; total: number; text: string; options: string[]; time: number; score: number };
@@ -33,7 +33,11 @@ export default function Solo({ quizId, count, talk = false, ai = false, onExit, 
   };
   const clipRef = useRef<{ stop: () => void } | null>(null);
   const micOk = (ai && canRecord) || canListen;
-  useEffect(() => { alive.current = true; return () => { alive.current = false; clipRef.current?.stop(); stopSpeak(); stopListen(); }; }, []);
+  useEffect(() => {
+    alive.current = true;
+    startTestMusic();
+    return () => { alive.current = false; clipRef.current?.stop(); stopSpeak(); stopListen(); startBackgroundMusic(); };
+  }, []);
 
   useEffect(() => {
     if (!started) return;

@@ -9,7 +9,7 @@ import Editor, { Draft, newDraft } from "./Editor";
 import PdfImport from "./PdfImport";
 import Solo from "./Solo";
 import Room, { RoomState } from "./Room";
-import { playClick, setSoundsEnabled, soundsEnabled } from "./sounds";
+import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, stopBackgroundMusic } from "./sounds";
 
 type Tab = "home" | "library" | "create" | "board" | "profile";
 type Mode = "any" | "room" | "solo";
@@ -34,6 +34,19 @@ export default function App() {
   const [talk, setTalk] = useState(false);
   const [soundOn, setSoundOn] = useState(() => soundsEnabled());
   const socketRef = useRef<Socket | null>(null);
+
+  // Fon musiqasi brauzerning audio cheklovlariga mos ravishda ilk foydalanuvchi harakatidan keyin boshlanadi.
+  useEffect(() => {
+    startBackgroundMusic();
+    const unlock = () => { if (soundsEnabled()) startBackgroundMusic(); };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      stopBackgroundMusic();
+    };
+  }, []);
 
   const say = useCallback((text: string, bad = false) => { setToast({ text, bad }); setTimeout(() => setToast(null), 3200); }, []);
 

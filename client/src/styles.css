@@ -137,7 +137,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p)}textarea{resize:no
 .ai-note{padding:14px;border-radius:16px;background:linear-gradient(110deg,#8b5cf61f,#ec489914);border:1px solid #9a7bff55}.ai-note b{font-size:12px;color:#c4b5fd}.ai-note p{margin:6px 0 0;font-size:14px;line-height:1.45}
 
 /* Sound control: compact, consistent and kept clear of primary navigation. */
-.sound-toggle{display:grid;place-items:center;flex:0 0 auto;width:38px;height:38px;border-radius:13px;color:#c7c9e7;background:linear-gradient(145deg,#1c2040ee,#11152bee);border:1px solid #ffffff20;box-shadow:0 5px 18px #0003;transition:transform .16s ease,border-color .16s ease,background .16s ease;color .16s ease;backdrop-filter:blur(12px)}
+.sound-toggle{display:grid;place-items:center;flex:0 0 auto;width:38px;height:38px;border-radius:13px;color:#c7c9e7;background:linear-gradient(145deg,#1c2040ee,#11152bee);border:1px solid #ffffff20;box-shadow:0 5px 18px #0003;transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease;backdrop-filter:blur(12px)}
 .sound-toggle:active{transform:scale(.94)}
 .sound-toggle.is-on{color:#c4b5fd;border-color:#a78bfa70;background:linear-gradient(145deg,#32265aee,#171a35ee);box-shadow:0 0 0 3px #8b5cf61a,0 5px 18px #0003}
 .sound-toggle.in-header{margin-left:auto;margin-right:8px}

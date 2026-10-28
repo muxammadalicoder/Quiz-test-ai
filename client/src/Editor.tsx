@@ -74,7 +74,7 @@ export default function Editor({ draft, categories, onDone, onCancel }: { draft:
       <button className="ghost" disabled={d.questions.length >= 300} onClick={() => { if (review) setVerificationStale(true); setD({ ...d, questions: [...d.questions, blank()] }); }}><Plus size={16} /> Savol qo‘shish</button>
       <div className="card stack">
         <b><ShieldCheck size={16} style={{display:"inline",verticalAlign:"middle"}}/> Uchta AI bilan javoblarni tekshirish</b>
-        <p className="muted">Gemini, GPT va Claude har bir savolni mustaqil yechadi. Kamida ikkita model bir xil javobni tanlamasa, javob avtomatik o‘zgartirilmaydi. Tekshiruv API xarajatini keltirishi mumkin.</p>
+        <p className="muted">Gemini, GPT va Groq har bir savolni mustaqil yechadi. Kamida ikkita model bir xil javobni tanlamasa, javob avtomatik o‘zgartirilmaydi. Tekshiruv API xarajatini keltirishi mumkin.</p>
         <button className="ghost" disabled={checking || busy || d.questions.some(q => !q.text.trim() || q.options.filter(o => o.trim()).length < 2)} onClick={verify}>{checking ? "Uchta AI tekshiryapti…" : "AI bilan tekshirish"}</button>
         {review && <p className={review.reviewCount ? "err" : "muted"}>{review.verifiedCount} ta savol tekshiruvdan o‘tdi. {review.reviewCount} ta savolni qo‘lda ko‘rib chiqing.</p>}
       </div>

@@ -106,6 +106,19 @@ export function Profile({ user, onSave, onLogout }: { user: User; onSave: (u: Us
         <div><b>{user.games}</b><small>O‘YINLAR</small></div><div><b>{user.wins}</b><small>G‘ALABA</small></div><div><b>{user.bestScore}</b><small>REKORD</small></div>
       </div>
       <div className="medals"><span>🥇 {user.podiums[0]}</span><span>🥈 {user.podiums[1]}</span><span>🥉 {user.podiums[2]}</span></div>
+      <div className="card stack">
+        <b className="sec">🏆 Yutuqlar</b>
+        <div className="grid2">
+          <div className={`tile ${user.games >= 1 ? "t-green" : ""}`}><span style={{fontSize:24}}>🎮</span><b>Birinchi o‘yin</b><small>{user.games >= 1 ? "Ochilgan" : "1 ta o‘yin o‘ynang"}</small></div>
+          <div className={`tile ${user.wins >= 1 ? "t-purple" : ""}`}><span style={{fontSize:24}}>🥇</span><b>Birinchi g‘alaba</b><small>{user.wins >= 1 ? "Ochilgan" : "Birinchi g‘alabaga erishing"}</small></div>
+          <div className={`tile ${user.xp >= 500 ? "t-cyan" : ""}`}><span style={{fontSize:24}}>⚡</span><b>500 XP</b><small>{user.xp >= 500 ? "Ochilgan" : `${Math.max(0, 500 - user.xp)} XP qoldi`}</small></div>
+          <div className={`tile ${user.games >= 10 ? "t-orange" : ""}`}><span style={{fontSize:24}}>🔥</span><b>Faol o‘yinchi</b><small>{user.games >= 10 ? "Ochilgan" : `${Math.max(0, 10 - user.games)} ta o‘yin qoldi`}</small></div>
+        </div>
+      </div>
+      <div className="card stack"><b className="sec">📊 Natijalar tahlili</b>
+        <div className="stat-row"><div><b>{user.games ? Math.round(user.wins / user.games * 100) : 0}%</b><small>G‘ALABA ULUSHI</small></div><div><b>{user.games ? Math.round(user.totalScore / user.games) : 0}</b><small>O‘RTACHA BALL</small></div><div><b>{user.totalScore}</b><small>JAMI BALL</small></div></div>
+        <small className="muted">Tahlil profilingizda saqlangan o‘yin statistikalariga asoslanadi.</small>
+      </div>
       <div className="card stack"><b className="sec">Ism</b>
         <div className="row gap"><input value={name} maxLength={18} onChange={e => setName(e.target.value)} /><button className="primary" disabled={name.trim() === user.name || name.trim().length < 2} onClick={() => patch({ name })}>Saqlash</button></div></div>
       <div className="card stack"><b className="sec">Animatsiyali avatar tanlang</b>

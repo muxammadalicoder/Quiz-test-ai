@@ -108,7 +108,7 @@ export function matchAnswer(heard: string[], options: string[]): number {
 }
 
 // --- Mikrofon yozuvi (server orqali tanish) ---
-export const canRecord = typeof navigator.mediaDevices?.getUserMedia === "function" && !!w.MediaRecorder;
+export const canRecord = typeof window !== "undefined" && !!window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === "function" && typeof w.MediaRecorder === "function";
 export async function startClip(maxMs = 7000): Promise<{ stop: () => void; done: Promise<{ b64: string; mime: string }> }> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];

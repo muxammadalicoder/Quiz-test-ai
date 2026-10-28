@@ -1,7 +1,5 @@
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
-import multer from "multer";
-import mammoth from "mammoth";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
 import { existsSync } from "node:fs";
@@ -10,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -136,41 +134,6 @@ app.patch("/api/me", auth, limit(30, 60000), (req, res) => {
   res.json({ user: publicUser(u) });
 });
 
-// PDF/DOCX fayldan test import qilish. Frontend ushbu endpointga POST yuboradi.
-const quizFileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
-app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res, next) => {
-  quizFileUpload.single("pdf")(req, res, (err: any) => {
-    if (err) {
-      const message = err.code === "LIMIT_FILE_SIZE" ? "Fayl hajmi 15 MB dan oshmasin." : "Faylni yuklab bo‘lmadi. PDF yoki DOCX faylni qayta tanlang.";
-      return res.status(400).json({ error: message });
-    }
-    next();
-  });
-}, async (req, res) => {
-  const file = req.file;
-  if (!file) return res.status(400).json({ error: "Avval PDF yoki DOCX faylni tanlang." });
-  if (!aiEnabled) return res.status(503).json({ error: "AI ishlashi uchun Render’da GEMINI_API_KEY kalitini sozlang." });
-  if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "AI fayl tahlili uchun kunlik limit tugagan yoki AI vaqtincha band. Ertaga qayta urinib ko‘ring." });
-
-  const filename = (file.originalname || "").toLowerCase();
-  try {
-    let quiz;
-    if (filename.endsWith(".pdf") || file.mimetype === "application/pdf") {
-      quiz = await parseQuizPdf(file.buffer);
-    } else if (filename.endsWith(".docx") || file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      const result = await mammoth.extractRawText({ buffer: file.buffer });
-      quiz = await parseQuizDocxText(result.value);
-    } else {
-      return res.status(400).json({ error: "Faqat PDF yoki DOCX fayl qabul qilinadi." });
-    }
-    if (!quiz) return res.status(422).json({ error: "Fayldan savollar ajratilmadi. Faylda matnli testlar va variantlar borligini tekshiring yoki boshqa fayl yuboring." });
-    res.json({ quiz, warning: "AI ajratgan savol va javoblarni saqlashdan oldin tekshiring." });
-  } catch (err) {
-    console.error("Test faylini tahlil qilish xatosi:", err);
-    res.status(500).json({ error: "Fayl tahlilida server xatosi yuz berdi. Birozdan keyin qayta urinib ko‘ring." });
-  }
-});
-
 app.get("/api/quizzes", auth, (req, res) => {
   const mine = req.query.scope === "mine"; const search = clean(req.query.q, 40).toLowerCase();
   const list = Object.values(quizzes())
@@ -229,9 +192,10 @@ function award(u: User, score: number, rank: number | null, solo: boolean) {
 // ---- Tasodifiy savollar: 20/25/30 ta (yoki hammasi), savollar va variantlar aralashtiriladi ----
 const COUNTS = [20, 25, 30];
 function shuffle<T>(a: T[]): T[] { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = randomInt(i + 1); [r[i], r[j]] = [r[j], r[i]]; } return r; }
-function pick(quiz: Quiz, count: unknown): Quiz {
+function pick(quiz: Quiz, count: unknown, shuffleQuestions = false): Quiz {
   const n = COUNTS.includes(Number(count)) ? Number(count) : quiz.questions.length;
-  const qs = shuffle(quiz.questions).slice(0, n).map(q => {
+  const orderedQuestions = shuffleQuestions ? shuffle(quiz.questions) : [...quiz.questions];
+  const qs = orderedQuestions.slice(0, n).map(q => {
     const order = shuffle(q.options.map((_, i) => i));
     return { ...q, options: order.map(i => q.options[i]), correct: order.indexOf(q.correct) };
   });
@@ -252,7 +216,7 @@ app.post("/api/solo/start", auth, limit(40, 60000), (req, res) => {
   const quiz = quizzes()[String(req.body?.quizId)];
   if (!quiz || (!quiz.isPublic && quiz.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   const sid = uid() + uid();
-  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
+  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count, req.body?.shuffleQuestions === true), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
   solos.set(sid, s);
   res.json({ sid, title: quiz.title, question: soloQ(s) });
 });
@@ -422,7 +386,7 @@ io.on("connection", (socket: Socket) => {
     if (roomOf(userId)) return err("Siz allaqachon xonadasiz.");
     const quiz = quizzes()[String(b.quizId)];
     if (!quiz || (!quiz.isPublic && quiz.ownerId !== userId)) return err("Test topilmadi.");
-    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
+    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count, b.shuffleQuestions === true), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
     r.players.set(userId, { picks: {}, userId, score: 0, streak: 0, connected: true, lastSeen: Date.now() });
     rooms.set(r.code, r); push(r);
   });

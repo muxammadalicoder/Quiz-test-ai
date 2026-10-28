@@ -31,6 +31,7 @@ export default function App() {
   const [guestName, setGuestName] = useState("");
   const [online, setOnline] = useState(0);
   const [count, setCount] = useState(0);
+  const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [talk, setTalk] = useState(false);
   const [soundOn, setSoundOn] = useState(() => soundsEnabled());
   const socketRef = useRef<Socket | null>(null);
@@ -131,7 +132,7 @@ export default function App() {
 
   const view = () => {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
-    if (soloId) return <Solo quizId={soloId} count={count} talk={talk} ai={!!cfg.ai} onExit={() => setSoloId("")} onUser={setUser} />;
+    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} onExit={() => setSoloId("")} onUser={setUser} />;
     if (pdfImport) return <PdfImport categories={cfg.categories} onCancel={() => setPdfImport(false)} onDone={() => { setPdfImport(false); setTab("library"); setLibKey(k => k + 1); say("PDF testlari saqlandi ✓"); }} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     switch (tab) {
@@ -167,11 +168,15 @@ export default function App() {
           <div className="stack">
             <p className="muted">{sheetQuiz.description || "Tavsif yo‘q"}</p>
             <small className="muted">{sheetQuiz.category} · {sheetQuiz.count} savol · {sheetQuiz.plays} marta o‘ynalgan · Muallif: {sheetQuiz.owner}</small>
-            {mode !== "any" && <div className="stack"><small className="muted">🔀 Savollar har safar tasodifiy aralashadi. Nechta savol bo‘lsin?</small>
-              <div className="chips">{[0, 20, 25, 30].filter(n => n === 0 || n < sheetQuiz.count).map(n => <button key={n} className={count === n ? "on" : ""} onClick={() => setCount(n)}>{n === 0 ? `Hammasi (${sheetQuiz.count})` : `${n} ta`}</button>)}</div></div>}
+            {mode !== "any" && <div className="stack">
+              <small className="muted">Nechta savol bo‘lsin?</small>
+              <div className="chips">{[0, 20, 25, 30].filter(n => n === 0 || n < sheetQuiz.count).map(n => <button key={n} className={count === n ? "on" : ""} onClick={() => setCount(n)}>{n === 0 ? `Hammasi (${sheetQuiz.count})` : `${n} ta`}</button>)}</div>
+              <button className={`ghost ${shuffleQuestions ? "is-on" : ""}`} onClick={() => setShuffleQuestions(v => !v)}>{shuffleQuestions ? "🔀 Savollar aralashtiriladi: YOQILGAN" : "🔀 Savollarni aralashtirish: O‘CHIRILGAN"}</button>
+              <small className="muted">{shuffleQuestions ? "Savollar tasodifiy tartibda beriladi." : "Savollar testdagi asl tartibda beriladi."}</small>
+            </div>}
             {mode === "solo" && <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>}
             {mode === "solo" && <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>}
-            {mode === "room" && <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>}
+            {mode === "room" && <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count, shuffleQuestions }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>}
             {mode === "any" && <div className="row gap">{mine && <button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button>}<button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button></div>}
           </div>
         )}

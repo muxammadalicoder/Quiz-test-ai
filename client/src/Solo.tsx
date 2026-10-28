@@ -14,7 +14,7 @@ const LETTERS = ["A", "B", "C", "D"];
 const speechOf = (q: { text: string; options: string[] }, n?: number) =>
   `${n ? `${n}-savol. ` : ""}${q.text.replace(/[.?!]+$/, "")}. Variantlar. ${q.options.map((o, i) => `${LETTERS[i]} variant: ${o.replace(/[.?!]+$/, "")}.`).join(" ")}`;
 
-export default function Solo({ quizId, count, talk = false, ai = false, onExit, onUser }: { quizId: string; count: number; talk?: boolean; ai?: boolean; onExit: () => void; onUser: (u: User) => void }) {
+export default function Solo({ quizId, count, shuffleQuestions = false, talk = false, ai = false, onExit, onUser }: { quizId: string; count: number; shuffleQuestions?: boolean; talk?: boolean; ai?: boolean; onExit: () => void; onUser: (u: User) => void }) {
   const [sid, setSid] = useState(""); const [title, setTitle] = useState(""); const [q, setQ] = useState<Q | null>(null);
   const [res, setRes] = useState<Res | null>(null); const [picked, setPicked] = useState(-1); const [left, setLeft] = useState(0);
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [showFinal, setShowFinal] = useState(false); const [early, setEarly] = useState<Res["finished"] | null>(null);
@@ -41,8 +41,8 @@ export default function Solo({ quizId, count, talk = false, ai = false, onExit, 
 
   useEffect(() => {
     if (!started) return;
-    api("/api/solo/start", { body: { quizId, count, talk } }).then(d => { setSid(d.sid); setTitle(d.title); setQ(d.question); }).catch(e => setErr(e.message));
-  }, [quizId, started]);
+    api("/api/solo/start", { body: { quizId, count, talk, shuffleQuestions } }).then(d => { setSid(d.sid); setTitle(d.title); setQ(d.question); }).catch(e => setErr(e.message));
+  }, [quizId, started, shuffleQuestions]);
 
   useEffect(() => {
     if (!q) return; lockRef.current = false; advRef.current = false; curRef.current = q.index; setHint("");

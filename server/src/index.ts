@@ -1,6 +1,4 @@
 import express, { NextFunction, Request, Response } from "express";
-import multer from "multer";
-import mammoth from "mammoth";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
@@ -10,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, aiVerificationReady, explain, listenChoice, tts, ttsCached, verifyQuizQuestions } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -37,7 +35,7 @@ app.set("trust proxy", 1);
 app.use((_, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=()");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   // Telegram Web iframe ichida ochilishi uchun faqat Telegram domenlariga ruxsat
   res.setHeader("Content-Security-Policy",
     "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
@@ -104,6 +102,16 @@ const quizCard = (q: Quiz) => ({
 // ---- Ochiq yo'llar ----
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
 app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
+app.post("/api/ai/verify-quiz", auth, limit(5, 60000), async (req, res) => {
+  if (!aiVerificationReady) return res.status(503).json({ error: "Uchta AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va ANTHROPIC_API_KEY kerak." });
+  const questions = req.body?.questions;
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 300) return res.status(400).json({ error: "1 tadan 300 tagacha savol yuboring." });
+  try {
+    const result = await verifyQuizQuestions(questions);
+    if (!result) return res.status(502).json({ error: "AI tekshiruvini yakunlab bo'lmadi. Kalitlar va Render loglarini tekshiring." });
+    res.json(result);
+  } catch (e) { console.error("Test tekshiruvi xatosi:", String(e)); res.status(502).json({ error: "Testni tekshirish vaqtida xatolik yuz berdi." }); }
+});
 
 app.post("/api/auth/telegram", limit(30, 60000), (req, res) => {
   const tg = verifyInitData(req.body?.initData, BOT_TOKEN);
@@ -149,26 +157,6 @@ app.get("/api/quizzes/:id", auth, (req, res) => {
   if (!q || (!q.isPublic && q.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   res.json({ quiz: q.ownerId === me(req).id ? { ...quizCard(q), questions: q.questions } : quizCard(q) });
 });
-const quizUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
-app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), quizUpload.single("pdf"), async (req, res) => {
-  if (!aiEnabled) return res.status(503).json({ error: "AI sozlanmagan. Render Environment bo'limida GEMINI_API_KEY ni tekshiring." });
-  const file = req.file;
-  if (!file) return res.status(400).json({ error: "PDF yoki DOCX faylni tanlang." });
-  if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "Bugungi AI fayl tahlili limiti tugadi." });
-  try {
-    const name = (file.originalname || "").toLowerCase();
-    const isPdf = file.mimetype === "application/pdf" || name.endsWith(".pdf");
-    const isDocx = file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx");
-    if (!isPdf && !isDocx) return res.status(400).json({ error: "Faqat PDF yoki DOCX fayl yuklang." });
-    const quiz = isPdf ? await parseQuizPdf(file.buffer) : await parseQuizDocxText((await mammoth.extractRawText({ buffer: file.buffer })).value);
-    if (!quiz?.questions?.length) return res.status(422).json({ error: "Fayldan test savollari ajratilmadi. Fayl matnli ekanini tekshiring yoki kichikroq fayl yuboring." });
-    res.json({ quiz, warning: "AI javoblarni xato belgilashi mumkin. Testni saqlashdan oldin to'g'ri javoblarni tekshiring." });
-  } catch (e) {
-    console.error("Test faylini tahlil qilish xatosi:", String(e));
-    res.status(422).json({ error: "Fayl tahlil qilinmadi. PDF/DOCX fayl buzilmaganini tekshirib, qayta urinib ko'ring." });
-  }
-});
-
 app.post("/api/quizzes", auth, limit(20, 60000), (req, res) => {
   const v = validateQuiz(req.body);
   if (!v.ok) return res.status(400).json({ error: v.error });

@@ -103,7 +103,7 @@ const quizCard = (q: Quiz) => ({
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
 app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
 app.post("/api/ai/verify-quiz", auth, limit(5, 60000), async (req, res) => {
-  if (!aiVerificationReady) return res.status(503).json({ error: "Uchta AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va ANTHROPIC_API_KEY kerak." });
+  if (!aiVerificationReady) return res.status(503).json({ error: "Uchta AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY kerak." });
   const questions = req.body?.questions;
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 300) return res.status(400).json({ error: "1 tadan 300 tagacha savol yuboring." });
   try {

@@ -121,7 +121,7 @@ export async function tts(text: string): Promise<string | null> {
 
 type AnswerCheck = { index: number; confidence: "high" | "medium" | "low"; reason?: string };
 
-/** GPT va Claude savol javoblarini mustaqil tekshiradi. Kalitlar faqat server muhitida saqlanadi. */
+/** GPT va Groq savol javoblarini mustaqil tekshiradi. Kalitlar faqat server muhitida saqlanadi. */
 async function checkWithOpenAI(questions: PdfQuestion[]): Promise<AnswerCheck[] | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
@@ -131,7 +131,7 @@ async function checkWithOpenAI(questions: PdfQuestion[]): Promise<AnswerCheck[] 
   try {
     const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", signal: ctrl.signal,
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-4.1-mini", temperature: 0, max_tokens: 7000,
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-4.1-mini", temperature: 0, max_completion_tokens: 7000,
         response_format: { type: "json_object" }, messages: [{ role: "system", content: "Aniq, ehtiyotkor test tekshiruvchisi. Noma'lum bo'lsa index=-1." }, { role: "user", content: prompt }] }) });
     if (!r.ok) { console.error("OpenAI test tekshiruvi xatosi:", r.status, (await r.text().catch(() => "")).slice(0, 250)); return null; }
     const j: any = await r.json(); const raw = j?.choices?.[0]?.message?.content;
@@ -142,24 +142,24 @@ async function checkWithOpenAI(questions: PdfQuestion[]): Promise<AnswerCheck[] 
   finally { clearTimeout(timer); }
 }
 
-async function checkWithClaude(questions: PdfQuestion[]): Promise<AnswerCheck[] | null> {
-  const key = process.env.ANTHROPIC_API_KEY;
+async function checkWithGroq(questions: PdfQuestion[]): Promise<AnswerCheck[] | null> {
+  const key = process.env.GROQ_API_KEY;
   if (!key) return null;
   const payload = questions.map((q, i) => ({ id: i, question: q.text, options: q.options, proposedIndex: q.correct }));
   const prompt = `Sen test javoblarini tekshiruvchi mustaqil ekspertsan. Har savolni mustaqil yech, proposedIndex ga ko'r-ko'rona ishonma. Variantlar ichidan aniq to'g'ri javob indeksini tanla (0 dan boshlanadi). Ishonchli xulosa qilib bo'lmasa index=-1. Faqat JSON qaytar: {"results":[{"id":0,"index":1,"confidence":"high","reason":"qisqa sabab"}]}. Savollar: ${JSON.stringify(payload)}`;
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", signal: ctrl.signal,
-      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5", max_tokens: 7000, temperature: 0,
-        system: "Aniq va ehtiyotkor test tekshiruvchisi. Faqat JSON qaytar. Noma'lum bo'lsa index=-1.", messages: [{ role: "user", content: prompt }] }) });
-    if (!r.ok) { console.error("Claude test tekshiruvi xatosi:", r.status, (await r.text().catch(() => "")).slice(0, 250)); return null; }
-    const j: any = await r.json(); const raw = (j?.content || []).filter((x: any) => x.type === "text").map((x: any) => x.text).join("");
-    const cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", signal: ctrl.signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: process.env.GROQ_MODEL || "openai/gpt-oss-120b", temperature: 0, max_completion_tokens: 7000,
+        response_format: { type: "json_object" }, messages: [{ role: "system", content: "Aniq va ehtiyotkor test tekshiruvchisi. Faqat JSON qaytar. Noma'lum bo'lsa index=-1." }, { role: "user", content: prompt }] }) });
+    if (!r.ok) { console.error("Groq test tekshiruvi xatosi:", r.status, (await r.text().catch(() => "")).slice(0, 250)); return null; }
+    const j: any = await r.json(); const raw = j?.choices?.[0]?.message?.content;
+    const cleaned = String(raw || "").replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed.results)) return null;
     return parsed.results.map((x: any) => ({ index: Number.isInteger(x.index) ? x.index : -1, confidence: x.confidence === "high" || x.confidence === "medium" ? x.confidence : "low", reason: String(x.reason || "").slice(0, 180) }));
-  } catch (e) { console.error("Claude test tekshiruvi bajarilmadi:", String(e)); return null; }
+  } catch (e) { console.error("Groq test tekshiruvi bajarilmadi:", String(e)); return null; }
   finally { clearTimeout(timer); }
 }
 
@@ -176,7 +176,7 @@ async function checkWithGemini(questions: PdfQuestion[]): Promise<AnswerCheck[] 
   } catch { return null; }
 }
 
-export const aiVerificationReady = !!(KEY && process.env.OPENAI_API_KEY && process.env.ANTHROPIC_API_KEY);
+export const aiVerificationReady = !!(KEY && process.env.OPENAI_API_KEY && process.env.GROQ_API_KEY);
 export type QuizVerificationQuestion = { text: string; options: string[]; correct: number; time?: number };
 export type QuizVerificationResult = { questions: Array<QuizVerificationQuestion & { verified: boolean; suggestedCorrect: number }>; verifiedCount: number; reviewCount: number; providers: string[] };
 
@@ -187,10 +187,10 @@ export async function verifyQuizQuestions(input: QuizVerificationQuestion[]): Pr
   for (let start = 0; start < input.length; start += 20) {
     const batch = input.slice(start, start + 20).map(q => ({ text: String(q.text || "").slice(0, 200), options: Array.isArray(q.options) ? q.options.map(x => String(x).slice(0, 100)).slice(0, 4) : [], correct: Number(q.correct), time: Number(q.time) || 20 }));
     if (batch.some(q => !q.text.trim() || q.options.length < 2 || !Number.isInteger(q.correct) || q.correct < 0 || q.correct >= q.options.length)) return null;
-    const [gemini, openAI, claude] = await Promise.all([checkWithGemini(batch), checkWithOpenAI(batch), checkWithClaude(batch)]);
+    const [gemini, openAI, groq] = await Promise.all([checkWithGemini(batch), checkWithOpenAI(batch), checkWithGroq(batch)]);
     for (let i = 0; i < batch.length; i++) {
       const q = batch[i]; const votes: number[] = [];
-      for (const result of [gemini?.[i], openAI?.[i], claude?.[i]]) {
+      for (const result of [gemini?.[i], openAI?.[i], groq?.[i]]) {
         if (result && result.confidence !== "low" && result.index >= 0 && result.index < q.options.length) votes.push(result.index);
       }
       const counts = new Map<number, number>(); for (const v of votes) counts.set(v, (counts.get(v) || 0) + 1);
@@ -200,27 +200,28 @@ export async function verifyQuizQuestions(input: QuizVerificationQuestion[]): Pr
     }
   }
   const verifiedCount = output.filter(q => q.verified).length;
-  return { questions: output, verifiedCount, reviewCount: output.length - verifiedCount, providers: ["Gemini", "GPT", "Claude"] };
+  return { questions: output, verifiedCount, reviewCount: output.length - verifiedCount, providers: ["Gemini", "GPT", "Groq"] };
 }
 
 /** Faqat kamida ikki mustaqil ovoz mos kelgan savollar saqlanadi. */
 async function verifyQuestions(candidates: PdfQuestion[]): Promise<{ questions: PdfQuestion[]; rejected: number; verifiedBy: string[] } | null> {
   if (!candidates.length) return null;
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
-  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
-  if (!hasOpenAI && !hasClaude) {
-    console.error("Test tekshiruvi to'xtatildi: OPENAI_API_KEY yoki ANTHROPIC_API_KEY kiritilmagan.");
+  const hasGroq = !!process.env.GROQ_API_KEY;
+  if (!hasOpenAI && !hasGroq) {
+    console.error("Test tekshiruvi to'xtatildi: OPENAI_API_KEY yoki GROQ_API_KEY kiritilmagan.");
     return null;
   }
   const accepted: PdfQuestion[] = []; let rejected = 0;
   // Hujjat juda katta bo'lsa ham javob hajmi va so'rov vaqti boshqariladigan bo'lishi uchun bo'laklab tekshiramiz.
   for (let start = 0; start < candidates.length; start += 20) {
     const batch = candidates.slice(start, start + 20);
-    const [openAI, claude] = await Promise.all([checkWithOpenAI(batch), checkWithClaude(batch)]);
+    const [gemini, openAI, groq] = await Promise.all([checkWithGemini(batch), checkWithOpenAI(batch), checkWithGroq(batch)]);
     for (let i = 0; i < batch.length; i++) {
-      const q = batch[i]; const votes: number[] = [q.correct];
-      if (openAI?.[i] && openAI[i].index >= 0 && openAI[i].index < q.options.length) votes.push(openAI[i].index);
-      if (claude?.[i] && claude[i].index >= 0 && claude[i].index < q.options.length) votes.push(claude[i].index);
+      const q = batch[i]; const votes: number[] = [];
+      for (const result of [gemini?.[i], openAI?.[i], groq?.[i]]) {
+        if (result && result.confidence !== "low" && result.index >= 0 && result.index < q.options.length) votes.push(result.index);
+      }
       const counts = new Map<number, number>(); for (const v of votes) counts.set(v, (counts.get(v) || 0) + 1);
       const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
       // Talab: kamida ikki ovoz bir xil. Bitta AI javobini tasdiqlangan deb qabul qilmaymiz.
@@ -229,7 +230,7 @@ async function verifyQuestions(candidates: PdfQuestion[]): Promise<{ questions: 
     }
   }
   if (!accepted.length) return null;
-  const verifiedBy = ["Gemini", ...(hasOpenAI ? ["GPT"] : []), ...(hasClaude ? ["Claude"] : [])];
+  const verifiedBy = ["Gemini", ...(hasOpenAI ? ["GPT"] : []), ...(hasGroq ? ["Groq"] : [])];
   return { questions: accepted, rejected, verifiedBy };
 }
 

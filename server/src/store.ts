@@ -294,6 +294,5 @@ export function seedQuizzes() {
     ["Dasturiy loyihada README fayli qanday vazifani bajaradi?", ["Dasturning kompilyatsiya qilingan bajariladigan kodini saqlash", "Ma’lumotlar bazasining zaxira nusxasini saqlash", "Loyiha haqida umumiy ma’lumot, o‘rnatish va foydalanish yo‘riqnomasi", "Loyiha byudjeti va xarajatlari bo‘yicha hisobotni saqlash"], 2],
     ["SWOT tahlilidagi “O” harfi nimani anglatadi?", ["Operations (operatsiyalar)", "Objectives (maqsadlar)", "Opportunities (imkoniyatlar)", "Obstacles (to‘siqlar)"], 2]]);
   mk("BBL — Axborot tizimlari va loyihalash", "Texnologiya", "BBL DOCX faylidan kiritilgan 237 ta test. To‘g‘ri javoblar belgilangan.", bblQuestions);
-  mk("BBL — Axborot tizimlari va loyihalash", "Texnologiya", "BBL DOCX faylidan kiritilgan 237 ta test. To‘g‘ri javoblar belgilangan.", bblQuestions);
   save();
 }

@@ -1,3 +1,4 @@
+import { bblQuestions } from "./bbl-tests.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -292,5 +293,7 @@ export function seedQuizzes() {
     ["Ma’lumotlar bazasini normallashtirishdan asosiy maqsad nima?", ["Ma’lumotlar takrorlanishini kamaytirib, yaxlitlikni ta’minlash", "So‘rovlarni bajarish uchun jadvallar sonini kamaytirish", "Ma’lumotlarni bulutli serverga ko‘chirib joylashtirish", "Ma’lumotlarni shifrlab, ularning xavfsizligini oshirish"], 0],
     ["Dasturiy loyihada README fayli qanday vazifani bajaradi?", ["Dasturning kompilyatsiya qilingan bajariladigan kodini saqlash", "Ma’lumotlar bazasining zaxira nusxasini saqlash", "Loyiha haqida umumiy ma’lumot, o‘rnatish va foydalanish yo‘riqnomasi", "Loyiha byudjeti va xarajatlari bo‘yicha hisobotni saqlash"], 2],
     ["SWOT tahlilidagi “O” harfi nimani anglatadi?", ["Operations (operatsiyalar)", "Objectives (maqsadlar)", "Opportunities (imkoniyatlar)", "Obstacles (to‘siqlar)"], 2]]);
+  mk("BBL — Axborot tizimlari va loyihalash", "Texnologiya", "BBL DOCX faylidan kiritilgan 237 ta test. To‘g‘ri javoblar belgilangan.", bblQuestions);
+  mk("BBL — Axborot tizimlari va loyihalash", "Texnologiya", "BBL DOCX faylidan kiritilgan 237 ta test. To‘g‘ri javoblar belgilangan.", bblQuestions);
   save();
 }

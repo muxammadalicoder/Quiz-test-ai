@@ -1,5 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
+import multer from "multer";
+import mammoth from "mammoth";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
 import { existsSync } from "node:fs";
@@ -8,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, aiVerificationReady, explain, listenChoice, tts, ttsCached, verifyQuizQuestions } from "./ai.js";
+import { aiAllowed, aiEnabled, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -102,16 +104,6 @@ const quizCard = (q: Quiz) => ({
 // ---- Ochiq yo'llar ----
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
 app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
-app.post("/api/ai/verify-quiz", auth, limit(5, 60000), async (req, res) => {
-  if (!aiVerificationReady) return res.status(503).json({ error: "Uchta AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY kerak." });
-  const questions = req.body?.questions;
-  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 300) return res.status(400).json({ error: "1 tadan 300 tagacha savol yuboring." });
-  try {
-    const result = await verifyQuizQuestions(questions);
-    if (!result) return res.status(502).json({ error: "AI tekshiruvini yakunlab bo'lmadi. Kalitlar va Render loglarini tekshiring." });
-    res.json(result);
-  } catch (e) { console.error("Test tekshiruvi xatosi:", String(e)); res.status(502).json({ error: "Testni tekshirish vaqtida xatolik yuz berdi." }); }
-});
 
 app.post("/api/auth/telegram", limit(30, 60000), (req, res) => {
   const tg = verifyInitData(req.body?.initData, BOT_TOKEN);
@@ -142,6 +134,41 @@ app.patch("/api/me", auth, limit(30, 60000), (req, res) => {
   }
   u.name = name; u.avatar = avatar; save();
   res.json({ user: publicUser(u) });
+});
+
+// PDF/DOCX fayldan test import qilish. Frontend ushbu endpointga POST yuboradi.
+const quizFileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res, next) => {
+  quizFileUpload.single("pdf")(req, res, (err: any) => {
+    if (err) {
+      const message = err.code === "LIMIT_FILE_SIZE" ? "Fayl hajmi 15 MB dan oshmasin." : "Faylni yuklab bo‘lmadi. PDF yoki DOCX faylni qayta tanlang.";
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: "Avval PDF yoki DOCX faylni tanlang." });
+  if (!aiEnabled) return res.status(503).json({ error: "AI ishlashi uchun Render’da GEMINI_API_KEY kalitini sozlang." });
+  if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "AI fayl tahlili uchun kunlik limit tugagan yoki AI vaqtincha band. Ertaga qayta urinib ko‘ring." });
+
+  const filename = (file.originalname || "").toLowerCase();
+  try {
+    let quiz;
+    if (filename.endsWith(".pdf") || file.mimetype === "application/pdf") {
+      quiz = await parseQuizPdf(file.buffer);
+    } else if (filename.endsWith(".docx") || file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      quiz = await parseQuizDocxText(result.value);
+    } else {
+      return res.status(400).json({ error: "Faqat PDF yoki DOCX fayl qabul qilinadi." });
+    }
+    if (!quiz) return res.status(422).json({ error: "Fayldan savollar ajratilmadi. Faylda matnli testlar va variantlar borligini tekshiring yoki boshqa fayl yuboring." });
+    res.json({ quiz, warning: "AI ajratgan savol va javoblarni saqlashdan oldin tekshiring." });
+  } catch (err) {
+    console.error("Test faylini tahlil qilish xatosi:", err);
+    res.status(500).json({ error: "Fayl tahlilida server xatosi yuz berdi. Birozdan keyin qayta urinib ko‘ring." });
+  }
 });
 
 app.get("/api/quizzes", auth, (req, res) => {

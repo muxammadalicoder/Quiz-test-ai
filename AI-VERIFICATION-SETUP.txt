@@ -1,0 +1,31 @@
+QUIZ ARENA — AI TEST JAVOBLARINI TEKSHIRISH
+
+ZIP ichidagi fayllarni loyihadagi aynan shu yo'llarga almashtiring:
+- server/src/ai.ts
+- server/src/index.ts
+- client/src/Editor.tsx
+
+RENDER -> Environment bo'limiga uchta API kalitini qo'shing:
+- GEMINI_API_KEY = Google Gemini API kaliti
+- OPENAI_API_KEY = OpenAI API kaliti
+- ANTHROPIC_API_KEY = Anthropic Claude API kaliti
+
+Ixtiyoriy model sozlamalari:
+- GEMINI_MODEL (bo'sh qoldirilsa koddagi fallback ro'yxati ishlatiladi)
+- OPENAI_MODEL (standart: gpt-4.1-mini)
+- ANTHROPIC_MODEL (standart: claude-sonnet-4-5)
+
+Keyin GitHub'ga push qiling va Render deploy tugashini kuting. Frontend ham qayta build/deploy bo'lishi kerak.
+
+Ishlatish:
+1. Quiz Arena'da yangi test yaratish yoki mavjud testni tahrirlashni oching.
+2. Savollar va variantlarni kiriting.
+3. “AI bilan tekshirish” tugmasini bosing.
+4. Kamida ikki AI bir xil javobni tanlagan savollar tasdiqlanadi va javob indeksi avtomatik tuzatiladi.
+5. AI'lar kelisha olmagan savollarda to'g'ri javobni qo'lda tanlang. Bunday savollar qo'lda belgilanmaguncha saqlash bloklanadi.
+
+Eslatma:
+- API kalitlarini GitHub kodiga yoki frontendga yozmang; faqat Render Environment'da saqlang.
+- Gemini, OpenAI va Claude API'larida foydalanish limiti va xarajat bo'lishi mumkin. Har bir savol uchta provayderga yuboriladi; ko'p savolli testlar qimmatroq va sekinroq bo'lishi mumkin.
+- Ikki yoki uchta AI kelishishi ham 100% kafolat emas. Muhim fanlar, huquq, tibbiyot va rasmiy imtihon savollarini ishonchli manba bilan tekshiring.
+- API kalitlari kiritilmagan bo'lsa, AI tekshiruv endpointi ishlamaydi; test yaratishning oddiy saqlash qismi ishlashda davom etadi.

@@ -136,10 +136,12 @@ app.patch("/api/me", auth, limit(30, 60000), (req, res) => {
 
 app.get("/api/quizzes", auth, (req, res) => {
   const mine = req.query.scope === "mine"; const search = clean(req.query.q, 40).toLowerCase();
+  const showMemorize = search.includes("yodlash uchun");
   const list = Object.values(quizzes())
     .filter(q => (mine ? q.ownerId === me(req).id : q.isPublic || q.ownerId === me(req).id))
+    .filter(q => showMemorize || !q.title.startsWith("Yodlash uchun — BBL "))
     .filter(q => !search || q.title.toLowerCase().includes(search) || q.category.toLowerCase().includes(search))
-    .sort((a, b) => b.plays - a.plays || b.createdAt - a.createdAt).slice(0, 100).map(quizCard);
+    .sort((a, b) => b.plays - a.plays || b.createdAt - a.createdAt).slice(0, req.query.forMemorize === "1" ? 1000 : 100).map(quizCard);
   res.json({ quizzes: list });
 });
 app.get("/api/quizzes/:id", auth, (req, res) => {
@@ -192,10 +194,16 @@ function award(u: User, score: number, rank: number | null, solo: boolean) {
 // ---- Tasodifiy savollar: 20/25/30 ta (yoki hammasi), savollar va variantlar aralashtiriladi ----
 const COUNTS = [20, 25, 30];
 function shuffle<T>(a: T[]): T[] { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = randomInt(i + 1); [r[i], r[j]] = [r[j], r[i]]; } return r; }
-function pick(quiz: Quiz, count: unknown, shuffleQuestions = false): Quiz {
-  const n = COUNTS.includes(Number(count)) ? Number(count) : quiz.questions.length;
-  const orderedQuestions = shuffleQuestions ? shuffle(quiz.questions) : [...quiz.questions];
-  const qs = orderedQuestions.slice(0, n).map(q => {
+function pick(quiz: Quiz, count: unknown, memorize = false, rangeStart?: unknown, rangeEnd?: unknown): Quiz {
+  let sourceQuestions = memorize ? [...quiz.questions] : (quiz.category === "Yodlash uchun" ? [...quiz.questions] : shuffle(quiz.questions));
+  if (memorize) {
+    const start = Math.max(0, Math.min(sourceQuestions.length, Number.isInteger(Number(rangeStart)) ? Number(rangeStart) : 0));
+    const requestedEnd = Number(rangeEnd);
+    const end = Number.isInteger(requestedEnd) ? Math.max(start, Math.min(sourceQuestions.length, requestedEnd)) : sourceQuestions.length;
+    sourceQuestions = sourceQuestions.slice(start, end);
+  }
+  const n = COUNTS.includes(Number(count)) ? Number(count) : sourceQuestions.length;
+  const qs = sourceQuestions.slice(0, n).map(q => {
     const order = shuffle(q.options.map((_, i) => i));
     return { ...q, options: order.map(i => q.options[i]), correct: order.indexOf(q.correct) };
   });
@@ -216,7 +224,7 @@ app.post("/api/solo/start", auth, limit(40, 60000), (req, res) => {
   const quiz = quizzes()[String(req.body?.quizId)];
   if (!quiz || (!quiz.isPublic && quiz.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   const sid = uid() + uid();
-  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count, req.body?.shuffleQuestions === true), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
+  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count, req.body?.memorize === true, req.body?.rangeStart, req.body?.rangeEnd), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
   solos.set(sid, s);
   res.json({ sid, title: quiz.title, question: soloQ(s) });
 });
@@ -386,7 +394,7 @@ io.on("connection", (socket: Socket) => {
     if (roomOf(userId)) return err("Siz allaqachon xonadasiz.");
     const quiz = quizzes()[String(b.quizId)];
     if (!quiz || (!quiz.isPublic && quiz.ownerId !== userId)) return err("Test topilmadi.");
-    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count, b.shuffleQuestions === true), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
+    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
     r.players.set(userId, { picks: {}, userId, score: 0, streak: 0, connected: true, lastSeen: Date.now() });
     rooms.set(r.code, r); push(r);
   });

@@ -98,7 +98,7 @@ export default function App() {
   // Telegram "orqaga" tugmasi
   useEffect(() => {
     const bb = tg?.BackButton; if (!bb) return;
-    const back = () => { if (soloId) setSoloId(""); else if (draft) setDraft(null); else if (pdfImport) setPdfImport(false); else if (tab !== "home") setTab("home"); };
+    const back = () => { if (soloId) { setSoloId(""); setMemorizeRange(null); } else if (draft) setDraft(null); else if (pdfImport) setPdfImport(false); else if (tab !== "home") setTab("home"); };
     const show = !room && (soloId || draft || pdfImport || tab !== "home");
     show ? bb.show() : bb.hide(); bb.onClick(back); return () => bb.offClick(back);
   }, [soloId, draft, pdfImport, tab, room]);
@@ -134,7 +134,7 @@ export default function App() {
 
   const view = () => {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
-    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} memorizeRange={memorizeRange} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
+    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} memorizeRange={tab === "memorize" ? memorizeRange : null} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
     if (pdfImport) return <PdfImport categories={cfg.categories} onCancel={() => setPdfImport(false)} onDone={() => { setPdfImport(false); setTab("library"); setLibKey(k => k + 1); say("PDF testlari saqlandi ✓"); }} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     switch (tab) {
@@ -177,8 +177,8 @@ export default function App() {
               <button className={`ghost ${shuffleQuestions ? "is-on" : ""}`} onClick={() => setShuffleQuestions(v => !v)}>{shuffleQuestions ? "🔀 Savollar aralashtiriladi: YOQILGAN" : "🔀 Savollarni aralashtirish: O‘CHIRILGAN"}</button>
               <small className="muted">{shuffleQuestions ? "Savollar tasodifiy tartibda beriladi." : "Savollar testdagi asl tartibda beriladi."}</small>
             </div>}
-            {mode === "solo" && <button className="primary lg" onClick={() => { setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>}
-            {mode === "solo" && <button className="primary lg ai" onClick={() => { setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>}
+            {mode === "solo" && <button className="primary lg" onClick={() => { setMemorizeRange(null); setTalk(false); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎯 Yakka o‘ynash</button>}
+            {mode === "solo" && <button className="primary lg ai" onClick={() => { setMemorizeRange(null); setTalk(true); setSoloId(sheetQuiz.id); setSheetQuiz(null); }}>🎙 AI bilan suhbat (ovozli)</button>}
             {mode === "room" && <button className="primary lg alt" onClick={() => { socketRef.current?.emit("room:create", { quizId: sheetQuiz.id, count, shuffleQuestions }); setSheetQuiz(null); }}>⚔️ Ommaviy xona ochish</button>}
             {mode === "any" && <div className="row gap">{mine && <button className="ghost grow" onClick={() => editQuiz(sheetQuiz)}>✏️ Tahrirlash</button>}<button className="ghost grow danger" onClick={() => removeQuiz(sheetQuiz)}>🗑 O‘chirish</button></div>}
           </div>

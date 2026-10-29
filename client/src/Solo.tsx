@@ -42,7 +42,7 @@ export default function Solo({ quizId, count, shuffleQuestions = false, talk = f
   useEffect(() => {
     if (!started) return;
     api("/api/solo/start", { body: { quizId, count, talk, shuffleQuestions, memorize: !!memorizeRange, rangeStart: memorizeRange?.start, rangeEnd: memorizeRange?.end } }).then(d => { setSid(d.sid); setTitle(d.title); setQ(d.question); }).catch(e => setErr(e.message));
-  }, [quizId, started, count, talk, shuffleQuestions, memorizeRange?.start, memorizeRange?.end]);
+  }, [quizId, started, shuffleQuestions, memorizeRange?.start, memorizeRange?.end]);
 
   useEffect(() => {
     if (!q) return; lockRef.current = false; advRef.current = false; curRef.current = q.index; setHint("");

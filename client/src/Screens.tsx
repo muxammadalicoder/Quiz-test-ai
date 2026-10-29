@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Brain, Flame, Hash, Lock, Plus, Search, Swords, Trophy, Users } from "lucide-react";
+import { Brain, Flame, Hash, Layers, Lock, Plus, Search, Swords, Trophy, Users } from "lucide-react";
 import { QuizCard, User, api, inTelegram } from "./api";
 import { AV, Avatar, Empty } from "./ui";
 
@@ -44,6 +44,7 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
         <button className="tile t-orange" onClick={() => go("create")}><Plus size={24} /><b>Test yaratish</b><small>O‘z savollaringizni yozing</small></button>
         <button className="tile t-green" onClick={() => go("board")}><Users size={24} /><b>Reyting</b><small>Eng kuchli o‘yinchilar</small></button>
         <button className="tile t-purple" onClick={() => go("memorize")}><Brain size={24} /><b>Yodlash uchun</b><small>Istalgan testni 10 tadan bo‘limlab o‘rganing</small></button>
+        <button className="tile t-cyan" onClick={() => go("sections50")}><Layers size={24} /><b>50 talik bo‘limlar</b><small>Testlarni 1–50, 51–100 va shu tartibda ishlang</small></button>
       </div>
       <b className="sec">🔥 Mashhur testlar</b>
       {top.map(q => <QuizItem key={q.id} q={q} onOpen={() => openQuiz(q)} />)}

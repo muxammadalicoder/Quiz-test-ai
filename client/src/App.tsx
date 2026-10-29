@@ -12,7 +12,7 @@ import Memorize from "./Memorize";
 import Room, { RoomState } from "./Room";
 import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, startTestMusic, stopBackgroundMusic } from "./sounds";
 
-type Tab = "home" | "library" | "create" | "board" | "profile" | "memorize";
+type Tab = "home" | "library" | "create" | "board" | "profile" | "memorize" | "sections50";
 type Mode = "any" | "room" | "solo";
 type Boot = "loading" | "ready" | "login" | "tgonly";
 
@@ -134,13 +134,14 @@ export default function App() {
 
   const view = () => {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
-    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} memorizeRange={tab === "memorize" ? memorizeRange : null} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
+    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} memorizeRange={(tab === "memorize" || tab === "sections50") ? memorizeRange : null} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
     if (pdfImport) return <PdfImport categories={cfg.categories} onCancel={() => setPdfImport(false)} onDone={() => { setPdfImport(false); setTab("library"); setLibKey(k => k + 1); say("PDF testlari saqlandi ✓"); }} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     switch (tab) {
       case "home": return <Home user={user} go={t => { if (t === "create") setDraft(newDraft()); else if (t === "room" || t === "solo") { setMode(t); setTab("library"); } else { setMode("any"); setTab(t as Tab); } }} openQuiz={q => { setMode("any"); setSheetQuiz(q); }} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
       case "library": return <Library mode={mode} categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} onImportPdf={() => setPdfImport(true)} refreshKey={libKey} />;
-      case "memorize": return <Memorize onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
+      case "memorize": return <Memorize sectionSize={10} title="Yodlash uchun" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
+      case "sections50": return <Memorize sectionSize={50} title="50 talik bo‘limlar" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
       case "board": return <Board me={user} />;
       case "profile": return <Profile user={user} onSave={setUser} onLogout={logout} />;
       default: return null;

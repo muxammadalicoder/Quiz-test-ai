@@ -3,9 +3,7 @@ import { ArrowLeft, BookOpen, Brain, ChevronRight, RotateCcw } from "lucide-reac
 import { QuizCard, api } from "./api";
 import { Empty } from "./ui";
 
-const SECTION_SIZE = 10;
-
-export default function Memorize({ onStart }: { onStart: (quizId: string, start: number, end: number) => void }) {
+export default function Memorize({ sectionSize = 10, title = "Yodlash uchun", onStart }: { sectionSize?: number; title?: string; onStart: (quizId: string, start: number, end: number) => void }) {
   const [quizzes, setQuizzes] = useState<QuizCard[] | null>(null);
   const [selected, setSelected] = useState<QuizCard | null>(null);
   const [error, setError] = useState("");
@@ -32,11 +30,11 @@ export default function Memorize({ onStart }: { onStart: (quizId: string, start:
         <div className="center-row" style={{ justifyContent: "flex-start", gap: 12 }}>
           <span className="qi-icon"><Brain size={24} /></span>
           <div className="grow">
-            <h1 className="h1 tight">Yodlash uchun</h1>
-            <small className="muted">Barcha testlar · 10 tadan bo‘limlarga ajratiladi</small>
+            <h1 className="h1 tight">{title}</h1>
+            <small className="muted">Barcha testlar · {sectionSize} tadan bo‘limlarga ajratiladi</small>
           </div>
         </div>
-        <p className="muted">Istalgan testni tanlang. Savollar 1–10, 11–20 va shu tartibda bo‘linadi; oxirgi bo‘limda qolgan savollar bo‘ladi.</p>
+        <p className="muted">Istalgan testni tanlang. Savollar {sectionSize} tadan ketma-ket bo‘linadi; oxirgi bo‘limda qolgan savollar bo‘ladi.</p>
       </div>
 
       {selected ? <>
@@ -45,12 +43,12 @@ export default function Memorize({ onStart }: { onStart: (quizId: string, start:
           <b>{selected.title}</b>
           <small className="muted">{selected.count} ta savol · {selected.category}</small>
         </div>
-        {Array.from({ length: Math.ceil(selected.count / SECTION_SIZE) }, (_, i) => {
-          const start = i * SECTION_SIZE;
-          const end = Math.min(start + SECTION_SIZE, selected.count);
+        {Array.from({ length: Math.ceil(selected.count / sectionSize) }, (_, i) => {
+          const start = i * sectionSize;
+          const end = Math.min(start + sectionSize, selected.count);
           return <button key={`${selected.id}-${start}`} className="qitem" onClick={() => onStart(selected.id, start, end)}>
             <span className="qi-icon"><BookOpen size={21} /></span>
-            <span className="qi-body"><b>{start + 1}–{end}-testlar</b><small>{end - start} ta savol · {i + 1}/{Math.ceil(selected.count / SECTION_SIZE)}-bo‘lim</small></span>
+            <span className="qi-body"><b>{start + 1}–{end}-savollar</b><small>{end - start} ta savol · {i + 1}/{Math.ceil(selected.count / sectionSize)}-bo‘lim</small></span>
             <span className="qi-plays"><ChevronRight size={18} /></span>
           </button>;
         })}

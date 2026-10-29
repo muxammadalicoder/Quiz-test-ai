@@ -194,8 +194,8 @@ function award(u: User, score: number, rank: number | null, solo: boolean) {
 // ---- Tasodifiy savollar: 20/25/30 ta (yoki hammasi), savollar va variantlar aralashtiriladi ----
 const COUNTS = [20, 25, 30];
 function shuffle<T>(a: T[]): T[] { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = randomInt(i + 1); [r[i], r[j]] = [r[j], r[i]]; } return r; }
-function pick(quiz: Quiz, count: unknown, memorize = false, rangeStart?: unknown, rangeEnd?: unknown): Quiz {
-  let sourceQuestions = memorize ? [...quiz.questions] : (quiz.category === "Yodlash uchun" ? [...quiz.questions] : shuffle(quiz.questions));
+function pick(quiz: Quiz, count: unknown, memorize = false, rangeStart?: unknown, rangeEnd?: unknown, shuffleQuestions = false): Quiz {
+  let sourceQuestions = memorize ? [...quiz.questions] : (shuffleQuestions ? shuffle(quiz.questions) : [...quiz.questions]);
   if (memorize) {
     const start = Math.max(0, Math.min(sourceQuestions.length, Number.isInteger(Number(rangeStart)) ? Number(rangeStart) : 0));
     const requestedEnd = Number(rangeEnd);
@@ -224,7 +224,7 @@ app.post("/api/solo/start", auth, limit(40, 60000), (req, res) => {
   const quiz = quizzes()[String(req.body?.quizId)];
   if (!quiz || (!quiz.isPublic && quiz.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   const sid = uid() + uid();
-  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count, req.body?.memorize === true, req.body?.rangeStart, req.body?.rangeEnd), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
+  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count, req.body?.memorize === true, req.body?.rangeStart, req.body?.rangeEnd, req.body?.shuffleQuestions === true), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
   solos.set(sid, s);
   res.json({ sid, title: quiz.title, question: soloQ(s) });
 });
@@ -394,7 +394,7 @@ io.on("connection", (socket: Socket) => {
     if (roomOf(userId)) return err("Siz allaqachon xonadasiz.");
     const quiz = quizzes()[String(b.quizId)];
     if (!quiz || (!quiz.isPublic && quiz.ownerId !== userId)) return err("Test topilmadi.");
-    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
+    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count, false, undefined, undefined, b.shuffleQuestions === true), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
     r.players.set(userId, { picks: {}, userId, score: 0, streak: 0, connected: true, lastSeen: Date.now() });
     rooms.set(r.code, r); push(r);
   });

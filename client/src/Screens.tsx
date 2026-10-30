@@ -110,7 +110,7 @@ export function QuickSearch() {
           {results.map((item: any, i: number) => <article className="answer-search-card" key={`${item.quizId}-${item.questionId || i}`}>
             <p className="answer-search-question">{item.question}</p>
             <div className="answer-search-options">{item.options.map((option: string, optionIndex: number) => <div key={optionIndex} className={`answer-search-option ${optionIndex === item.correctIndex ? "is-correct" : "is-wrong"}`}>
-              <span>{option}</span><b>{optionIndex === item.correctIndex ? "✓ To‘g‘ri javob" : "✕ Noto‘g‘ri javob"}</b>
+              <span>{option}</span>
             </div>)}</div>
           </article>)}
         </div> : searched ? <Empty icon="🔎" text="Mos test topilmadi. Boshqa so‘z yoki harflarni yozib ko‘ring." /> : null}

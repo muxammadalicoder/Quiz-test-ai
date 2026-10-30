@@ -149,3 +149,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p)}textarea{resize:no
 
 /* Savol qidiruvi: barcha variantlarni ko‘rsatish va to‘g‘ri javobni ajratish */
 .answer-search-results{display:flex;flex-direction:column;gap:10px}.answer-search-card{padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#1a1e38,#121528);display:flex;flex-direction:column;gap:11px}.answer-search-meta{display:flex;flex-direction:column;gap:3px}.answer-search-meta b{font-size:13px;color:#c4b5fd}.answer-search-meta span{font-size:11px;color:var(--mut)}.answer-search-question{margin:0;font-size:14px;font-weight:700;line-height:1.5}.answer-search-options{display:flex;flex-direction:column;gap:7px}.answer-search-option{display:grid;grid-template-columns:25px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;font-size:12px;line-height:1.4}.answer-search-option.is-correct{background:#123a2b;border:1px solid #22c55e66;color:#bbf7d0}.answer-search-option.is-wrong{background:#351d2a;border:1px solid #fb718566;color:#fecdd3}.answer-search-letter{font-weight:800;opacity:.8}.answer-search-option b{font-size:10px;white-space:nowrap}.quiz-search-hint{display:block}
+
+
+/* Tez topish: javob variantlari to‘liq kenglikda, matn kesilmasin */
+.answer-search-card{align-items:stretch}
+.answer-search-options{width:100%;min-width:0}
+.answer-search-option{display:block;width:100%;min-width:0;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.5}
+.answer-search-option span{display:block;width:100%;min-width:0}

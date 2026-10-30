@@ -52,23 +52,37 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
 
 export function Library({ mode, categories, openQuiz, onCreate, onImportPdf, refreshKey }: { mode: "any" | "room" | "solo"; categories: string[]; openQuiz: (q: QuizCard) => void; onCreate: () => void; onImportPdf: () => void; refreshKey: number }) {
   const [scope, setScope] = useState<"public" | "mine">("public"); const [q, setQ] = useState(""); const [cat, setCat] = useState("");
-  const [list, setList] = useState<QuizCard[] | null>(null);
+  const [list, setList] = useState<QuizCard[] | null>(null); const [questionMatches, setQuestionMatches] = useState<any[]>([]);
   useEffect(() => {
-    const t = setTimeout(() => api(`/api/quizzes?scope=${scope}&q=${encodeURIComponent(q)}`).then(d => setList(d.quizzes)).catch(() => setList([])), 250);
+    const t = setTimeout(() => api(`/api/quizzes?scope=${scope}&q=${encodeURIComponent(q)}`).then(d => { setList(d.quizzes); setQuestionMatches(d.questionMatches || []); }).catch(() => { setList([]); setQuestionMatches([]); }), 180);
     return () => clearTimeout(t);
   }, [scope, q, refreshKey]);
-  const shown = (list || []).filter(x => !cat || x.category === cat);
+  const shown = (list || []).filter(x => !cat || x.category === cat); const shownQuestionMatches = questionMatches.filter(x => !cat || x.category === cat);
   return (
     <div className="stack">
       <h1 className="h1">{mode === "room" ? "⚔️ Ommaviy o‘yin" : mode === "solo" ? "🎯 Yakka o‘yin" : "Testlar"}</h1>
       {mode !== "any" && <small className="muted">Test tanlang — {mode === "room" ? "xona shu test bilan ochiladi" : "o‘yin shu test bilan boshlanadi"}.</small>}
+      <section className="quiz-search-panel" aria-label="Test qidirish">
+        <label className="quiz-search-label"><Search size={16} /> Testni tez topish</label>
+        <div className="search"><Search size={20} /><input type="search" aria-label="Testlarni qidirish" autoComplete="off" placeholder="Savoldan 2–3 ta so‘z yozing…" value={q} onChange={e => setQ(e.target.value)} />{q && <button className="search-clear" aria-label="Qidiruvni tozalash" onClick={() => setQ("")}><X size={17} /></button>}</div>
+        <small className="quiz-search-hint">Savolni to‘liq yozmang. Eslab qolgan 2–3 ta so‘zni kiriting — mos savol va barcha javoblari darhol chiqadi.</small>
+        {q.trim() && <small className="muted">“{q.trim()}” bo‘yicha qidiruv natijalari</small>}
+      </section>
       <div className="seg"><button className={scope === "public" ? "on" : ""} onClick={() => setScope("public")}>🌍 Ommaviy</button><button className={scope === "mine" ? "on" : ""} onClick={() => setScope("mine")}>📁 Mening testlarim</button></div>
-      <div className="search"><Search size={17} /><input aria-label="Testlarni qidirish" placeholder="Test nomi, mavzu yoki savolni qidiring…" value={q} onChange={e => setQ(e.target.value)} />{q && <button className="search-clear" aria-label="Qidiruvni tozalash" onClick={() => setQ("")}><X size={16} /></button>}</div>
-      {q.trim() && <small className="muted">“{q.trim()}” bo‘yicha qidiruv natijalari</small>}
       <div className="chips"><button className={!cat ? "on" : ""} onClick={() => setCat("")}>Hammasi</button>{categories.map(c => <button key={c} className={cat === c ? "on" : ""} onClick={() => setCat(c)}>{c}</button>)}</div>
       {list === null ? <div className="center-t"><i className="spinner" /></div>
+        : q.trim() ? shownQuestionMatches.length ? <div className="answer-search-results">
+          <small className="muted">Mos savollar: {shownQuestionMatches.length} ta</small>
+          {shownQuestionMatches.map((item, i) => <article className="answer-search-card" key={`${item.quizId}-${item.index}-${i}`}>
+            <div className="answer-search-meta"><b>{item.quizTitle}</b><span>{item.category} · {item.index}-savol</span></div>
+            <p className="answer-search-question">{item.question}</p>
+            <div className="answer-search-options">{item.options.map((option: string, optionIndex: number) => <div key={optionIndex} className={`answer-search-option ${optionIndex === item.correctIndex ? "is-correct" : "is-wrong"}`}>
+              <span className="answer-search-letter">{String.fromCharCode(65 + optionIndex)}</span><span>{option}</span><b>{optionIndex === item.correctIndex ? "✓ To‘g‘ri" : "✕ Noto‘g‘ri"}</b>
+            </div>)}</div>
+          </article>)}
+        </div> : <Empty icon="🔎" text="Hozircha mos savol topilmadi. Yana bir-ikki kalit so‘z yozing." />
         : shown.length ? <><small className="muted">Topildi: {shown.length} ta test</small>{shown.map(x => <QuizItem key={x.id} q={x} mine={scope === "mine"} onOpen={() => openQuiz(x)} />)}</>
-        : <Empty icon="🗂️" text={q.trim() ? "Bu so‘z bo‘yicha test topilmadi. Boshqa so‘z bilan qidiring." : scope === "mine" ? "Hali test yaratmagansiz." : "Hozircha testlar topilmadi."} />}
+        : <Empty icon="🗂️" text={scope === "mine" ? "Hali test yaratmagansiz." : "Hozircha testlar topilmadi."} />}
       {scope === "mine" && <button className="primary" onClick={onCreate}><Plus size={16} /> Yangi test</button>}
       {mode === "any" && <button className="ghost" onClick={onImportPdf}>📄 PDF orqali test yuklash (Gemini AI)</button>}
     </div>

@@ -1,0 +1,29 @@
+QUIZ ARENA — TUZATILGAN FAYLLAR
+
+Ushbu arxiv to'liq loyiha emas, faqat o'zgartirilgan fayllardan iborat.
+Arxiv ichidagi fayllarni loyihangizdagi xuddi shu yo'llarga almashtiring.
+
+ASOSIY O'ZGARISHLAR:
+- Faqat "Bulutli texnologiyalar" test kategoriyasi qoldiriladi.
+- Server qayta ishga tushganda testlar o'z-o'zidan o'chib ketmaydi.
+- Mavjud Bulutli texnologiyalar testlari saqlanadi; boshqa kategoriyalar migratsiya vaqtida chiqariladi.
+- PDF va DOCX import endpointlari qo'shiladi (15 MB gacha).
+- AI javob tekshirish endpointi qo'shiladi.
+- Mikrofon uchun Permissions-Policy ruxsati tuzatiladi.
+- Server build TypeScript xatosini yashirmaydi.
+- Render sozlamalariga OPENAI_API_KEY va GROQ_API_KEY qo'shiladi.
+
+MUHIM — ADMIN PAROLI ORQALI TEST O'CHIRISH:
+Bu ataylab qo'shilgan funksiya, xato emas. U SAQLANGAN va o'chirish endpointining kodi o'zgartirilmagan.
+Testni faqat ADMIN_PASSWORD orqali belgilangan parol bilan o'chirish mumkin.
+Render Environment'dagi ADMIN_PASSWORD qiymatini o'chirmang yoki almashtirmang.
+Server restarti testlarni o'chirmaydi; faqat admin paroli bilan yuborilgan o'chirish so'rovi testni o'chiradi.
+
+Render Environment'da AI funksiyalari uchun quyidagi kalitlar kerak:
+GEMINI_API_KEY
+OPENAI_API_KEY
+GROQ_API_KEY
+
+Eslatma: ushbu muhitda npm install tarmoq cheklovi sabab yakunlanmadi.
+TypeScript/TSX sintaksis va package.json format tekshiruvlari muvaffaqiyatli bo'lgan.
+To'liq build, deploy va real muhit sinovlari hali tasdiqlanmagan.

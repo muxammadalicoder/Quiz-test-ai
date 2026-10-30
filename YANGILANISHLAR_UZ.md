@@ -4,13 +4,13 @@
 - Telegram Mini App uchun React/Vite frontend va Node.js/Socket.IO server.
 - Yakka test va real vaqt xonalari; xona kodi bilan do‘stlarni taklif qilish.
 - Testlarni qo‘lda yaratish va tahrirlash; bitta testga 300 tagacha savol.
-- PDF/DOCX dan Gemini AI yordamida 300 tagacha savol ajratish (API kaliti talab qilinadi).
+- PDF/DOCX dan AI yordamida 200 tagacha savol ajratish (Gemini, OpenAI va Groq API kalitlari talab qilinadi).
 - Gemini yordamida test savolini ovoz chiqarib o‘qish va ovozdan variant tanlash.
 - Profil, XP/daraja, umumiy reyting, o‘yin statistikasi va ochiladigan yutuqlar.
 - Gemini 429/5xx kabi vaqtinchalik xatolarida qayta urinish va model fallback.
 
 ## Muhim eslatma
-AI funksiyalari uchun Render Environment’da `GEMINI_API_KEY` to‘g‘ri kiritilgan bo‘lishi kerak. Google API’da model mavjudligi, limit va TTS qo‘llab-quvvatlashi hisob/regionga qarab farq qilishi mumkin. Ovoz va mikrofonni haqiqiy iPhone Telegram Mini App ichida sinash shart.
+PDF/DOCX importi va javoblarni uchta AI bilan tekshirish uchun Render Environment’da `GEMINI_API_KEY`, `OPENAI_API_KEY` va `GROQ_API_KEY` to‘g‘ri kiritilgan bo‘lishi kerak. Ovozli AI funksiyalari uchun kamida `GEMINI_API_KEY` talab qilinadi. Faqat “Bulutli texnologiyalar” test kategoriyasi faol. Google API’da model mavjudligi, limit va TTS qo‘llab-quvvatlashi hisob/regionga qarab farq qilishi mumkin. Ovoz va mikrofonni haqiqiy iPhone Telegram Mini App ichida sinash shart.
 
 Rejalashtiriladigan alohida katta funksiyalar: jadval asosida rasmiy turnirlar, kunlik topshiriqlarni serverda saqlash, guruh/o‘qituvchi hisobotlari va batafsil mavzu kesimidagi o‘quv tahlili. Ular mavjud kodda to‘liq backend funksiyasi sifatida yoqilgan deb hisoblanmasin.
 

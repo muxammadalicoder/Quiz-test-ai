@@ -3,7 +3,12 @@ QUIZ ARENA — AI TEST JAVOBLARINI TEKSHIRISH
 ZIP ichidagi fayllarni loyihadagi aynan shu yo'llarga almashtiring:
 - server/src/ai.ts
 - server/src/index.ts
+- server/src/store.ts
+- client/src/App.tsx
 - client/src/Editor.tsx
+- client/src/PdfImport.tsx
+- server/package.json
+- render.yaml
 
 RENDER -> Environment bo'limiga uchta API kalitini qo'shing:
 - GEMINI_API_KEY = Google Gemini API kaliti
@@ -18,7 +23,7 @@ Ixtiyoriy model sozlamalari:
 Keyin GitHub'ga push qiling va Render deploy tugashini kuting. Frontend ham qayta build/deploy bo'lishi kerak.
 
 Ishlatish:
-1. Quiz Arena'da yangi test yaratish yoki mavjud testni tahrirlashni oching.
+1. Quiz Arena'da faqat “Bulutli texnologiyalar” kategoriyasi mavjud. Yangi test yaratish yoki mavjud testni tahrirlashni oching.
 2. Savollar va variantlarni kiriting.
 3. “AI bilan tekshirish” tugmasini bosing.
 4. Kamida ikki AI bir xil javobni tanlagan savollar tasdiqlanadi va javob indeksi avtomatik tuzatiladi.

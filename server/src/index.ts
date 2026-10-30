@@ -243,6 +243,33 @@ app.get("/api/quizzes", auth, (req, res) => {
 
   res.json({ quizzes: quizResults, questionMatches });
 });
+app.get("/api/quick-search", auth, (req, res) => {
+  const search = normalizeSearch(clean(req.query.q, 200));
+  if (search.length < 2) return res.json({ results: [] });
+  const terms = [...new Set(search.split(" ").filter(word => word.length > 1))];
+  const visibleQuizzes = Object.values(quizzes()).filter(q =>
+    q.category === "Bulutli texnologiyalar" && (q.isPublic || q.ownerId === me(req).id)
+  );
+  const results = visibleQuizzes.flatMap(q => q.questions.map((question, index) => {
+    const searchable = normalizeSearch(`${question.text} ${question.options.join(" ")}`);
+    const phraseMatch = searchable.includes(search);
+    const allTermsMatch = terms.length > 0 && terms.every(term => searchable.includes(term));
+    const anyTermMatch = terms.some(term => searchable.includes(term));
+    return {
+      quizId: q.id,
+      questionId: `${q.id}-${index}`,
+      question: question.text,
+      options: question.options,
+      correctIndex: question.correct,
+      score: (phraseMatch ? 1000 : allTermsMatch ? 500 : 0) + (anyTermMatch ? terms.filter(term => searchable.includes(term)).length : 0)
+    };
+  }).filter(item => item.score > 0))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 100)
+    .map(({ score, ...item }) => item);
+  res.json({ results });
+});
+
 app.get("/api/quizzes/:id", auth, (req, res) => {
   const q = quizzes()[req.params.id];
   if (!q || (!q.isPublic && q.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });

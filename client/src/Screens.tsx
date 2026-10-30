@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Brain, Flame, Hash, Layers, Lock, Plus, Search, Swords, Trophy } from "lucide-react";
+import { Flame, Hash, Lock, Plus, Search, Swords, Trophy, Users, X } from "lucide-react";
 import { QuizCard, User, api, inTelegram } from "./api";
 import { AV, Avatar, Empty } from "./ui";
 
@@ -41,8 +41,8 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
       <div className="grid2">
         <button className="tile t-purple" onClick={() => go("room")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
         <button className="tile t-cyan" onClick={() => go("solo")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
-        <button className="tile t-purple" onClick={() => go("memorize")}><Brain size={24} /><b>Yodlash uchun</b><small>Istalgan testni 10 tadan bo‘limlab o‘rganing</small></button>
-        <button className="tile t-cyan" onClick={() => go("sections50")}><Layers size={24} /><b>50 talik bo‘limlar</b><small>Testlarni 1–50, 51–100 va shu tartibda ishlang</small></button>
+        <button className="tile t-orange" onClick={() => go("create")}><Plus size={24} /><b>Test yaratish</b><small>O‘z savollaringizni yozing</small></button>
+        <button className="tile t-green" onClick={() => go("board")}><Users size={24} /><b>Reyting</b><small>Eng kuchli o‘yinchilar</small></button>
       </div>
       <b className="sec">🔥 Mashhur testlar</b>
       {top.map(q => <QuizItem key={q.id} q={q} onOpen={() => openQuiz(q)} />)}
@@ -63,11 +63,12 @@ export function Library({ mode, categories, openQuiz, onCreate, onImportPdf, ref
       <h1 className="h1">{mode === "room" ? "⚔️ Ommaviy o‘yin" : mode === "solo" ? "🎯 Yakka o‘yin" : "Testlar"}</h1>
       {mode !== "any" && <small className="muted">Test tanlang — {mode === "room" ? "xona shu test bilan ochiladi" : "o‘yin shu test bilan boshlanadi"}.</small>}
       <div className="seg"><button className={scope === "public" ? "on" : ""} onClick={() => setScope("public")}>🌍 Ommaviy</button><button className={scope === "mine" ? "on" : ""} onClick={() => setScope("mine")}>📁 Mening testlarim</button></div>
-      <div className="search"><Search size={16} /><input placeholder="Test qidirish…" value={q} onChange={e => setQ(e.target.value)} /></div>
+      <div className="search"><Search size={17} /><input aria-label="Testlarni qidirish" placeholder="Test nomi, mavzu yoki savolni qidiring…" value={q} onChange={e => setQ(e.target.value)} />{q && <button className="search-clear" aria-label="Qidiruvni tozalash" onClick={() => setQ("")}><X size={16} /></button>}</div>
+      {q.trim() && <small className="muted">“{q.trim()}” bo‘yicha qidiruv natijalari</small>}
       <div className="chips"><button className={!cat ? "on" : ""} onClick={() => setCat("")}>Hammasi</button>{categories.map(c => <button key={c} className={cat === c ? "on" : ""} onClick={() => setCat(c)}>{c}</button>)}</div>
       {list === null ? <div className="center-t"><i className="spinner" /></div>
-        : shown.length ? shown.map(x => <QuizItem key={x.id} q={x} mine={scope === "mine"} onOpen={() => openQuiz(x)} />)
-        : <Empty icon="🗂️" text={scope === "mine" ? "Hali test yaratmagansiz." : "Hech narsa topilmadi."} />}
+        : shown.length ? <><small className="muted">Topildi: {shown.length} ta test</small>{shown.map(x => <QuizItem key={x.id} q={x} mine={scope === "mine"} onOpen={() => openQuiz(x)} />)}</>
+        : <Empty icon="🗂️" text={q.trim() ? "Bu so‘z bo‘yicha test topilmadi. Boshqa so‘z bilan qidiring." : scope === "mine" ? "Hali test yaratmagansiz." : "Hozircha testlar topilmadi."} />}
       {scope === "mine" && <button className="primary" onClick={onCreate}><Plus size={16} /> Yangi test</button>}
       {mode === "any" && <button className="ghost" onClick={onImportPdf}>📄 PDF orqali test yuklash (Gemini AI)</button>}
     </div>

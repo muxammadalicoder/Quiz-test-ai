@@ -18,7 +18,7 @@ type Boot = "loading" | "ready" | "login" | "tgonly";
 
 export default function App() {
   const [boot, setBoot] = useState<Boot>("loading");
-  const [cfg, setCfg] = useState<Config>({ guest: false, categories: ["Umumiy"], reactions: [] });
+  const [cfg, setCfg] = useState<Config>({ guest: false, categories: ["Bulutli texnologiyalar"], reactions: [] });
   const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<Mode>("any");

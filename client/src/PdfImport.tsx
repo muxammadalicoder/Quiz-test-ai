@@ -45,7 +45,7 @@ export default function PdfImport({ categories, onCancel, onDone }: { categories
   return <div className="stack">
     <div className="row between"><h1 className="h1">PDF yoki DOCX orqali test qo‘shish</h1><button className="icon-btn" onClick={onCancel} aria-label="Yopish"><X size={18}/></button></div>
     <div className="card stack">
-      <div className="row gap"><FileUp size={25}/><div className="grow"><b>PDF yoki DOCX faylni yuklang</b><small className="muted block">Telefon yoki kompyuterdan · 15 MB gacha · 300 tagacha savol</small></div></div>
+      <div className="row gap"><FileUp size={25}/><div className="grow"><b>PDF yoki DOCX faylni yuklang</b><small className="muted block">Telefon yoki kompyuterdan · 15 MB gacha · 200 tagacha savol</small></div></div>
       <input type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" onChange={e => { setFile(e.target.files?.[0] || null); setParsed(null); setError(""); }} />
       {file && <small className="muted">Tanlandi: {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</small>}
       <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> Gemini tahlil qilmoqda…</> : <><Upload size={17}/> Faylni tahlil qilish</>}</button>

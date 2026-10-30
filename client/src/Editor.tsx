@@ -4,7 +4,7 @@ import { EQuestion, QuizCard, api } from "./api";
 
 const blank = (): EQuestion => ({ text: "", options: ["", "", "", ""], correct: 0, time: 20 });
 export type Draft = { id?: string; title: string; description: string; category: string; isPublic: boolean; questions: EQuestion[] };
-export const newDraft = (): Draft => ({ title: "", description: "", category: "Umumiy", isPublic: true, questions: [blank()] });
+export const newDraft = (): Draft => ({ title: "", description: "", category: "Bulutli texnologiyalar", isPublic: true, questions: [blank()] });
 
 export default function Editor({ draft, categories, onDone, onCancel }: { draft: Draft; categories: string[]; onDone: (q: QuizCard) => void; onCancel: () => void }) {
   const [d, setD] = useState<Draft>(draft); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [checking, setChecking] = useState(false); const [review, setReview] = useState<{ verifiedCount: number; reviewCount: number; questions: Array<{ verified: boolean; suggestedCorrect: number }> } | null>(null); const [reviewedManual, setReviewedManual] = useState<number[]>([]); const [verificationStale, setVerificationStale] = useState(false);

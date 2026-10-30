@@ -73,15 +73,24 @@ export function publicUser(u: User) {
     games: u.games, wins: u.wins, podiums: u.podiums, bestScore: u.bestScore, totalScore: u.totalScore };
 }
 export function seedQuizzes() {
-  // Ushbu loyiha nusxasida faqat "Bulutli texnologiyalar — Oraliq test 2" testi qoladi.
-  // Eski tayyor va foydalanuvchi testlari ham tozalanadi.
-  db.quizzes = {};
+  // Faqat Bulutli texnologiyalar bo'limi qoldiriladi. Mavjud shu bo'lim testlari
+  // saqlanadi; server har ishga tushganda foydalanuvchi testlari qayta yozilmaydi.
+  let changed = false;
+  for (const [id, quiz] of Object.entries(db.quizzes)) {
+    if (quiz.category !== "Bulutli texnologiyalar") {
+      delete db.quizzes[id];
+      changed = true;
+    }
+  }
   const id = "bulutli-texnologiyalar-oraliq-2";
-  db.quizzes[id] = {
-    id, ownerId: "system", title: "Bulutli texnologiyalar — Oraliq test 2",
-    description: "Bulutli texnologiyalar bo‘yicha 200 ta savol. Har savolda 4 ta variant.",
-    category: "Bulutli texnologiyalar", isPublic: true, plays: 0, createdAt: Date.now(),
-    questions: bulutliTexnologiyalarQuestions
-  };
-  save();
+  if (!db.quizzes[id]) {
+    db.quizzes[id] = {
+      id, ownerId: "system", title: "Bulutli texnologiyalar — Oraliq test 2",
+      description: "Bulutli texnologiyalar bo‘yicha 200 ta savol. Har savolda 4 ta variant.",
+      category: "Bulutli texnologiyalar", isPublic: true, plays: 0, createdAt: Date.now(),
+      questions: bulutliTexnologiyalarQuestions
+    };
+    changed = true;
+  }
+  if (changed) save();
 }

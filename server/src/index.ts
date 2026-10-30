@@ -3,12 +3,14 @@ import cors from "cors";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
 import { existsSync } from "node:fs";
+import multer from "multer";
+import mammoth from "mammoth";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, explain, listenChoice, tts, ttsCached } from "./ai.js";
+import { aiAllowed, aiEnabled, aiVerificationReady, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, verifyQuizQuestions } from "./ai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -27,7 +29,7 @@ const AVATARS: Record<string, number> = {
   wolf: 2, lion: 2, dragon: 3, ghost: 3, robot: 4, alien: 5, phoenix: 7
 };
 const REACTIONS = ["🔥", "👏", "😂", "😮", "❤️", "🎉"];
-const CATEGORIES = ["Umumiy", "Texnologiya", "Tarix", "Geografiya", "Fan", "Til", "Sport", "Ko‘ngilochar", "Boshqa"];
+const CATEGORIES = ["Bulutli texnologiyalar"];
 
 const app = express();
 app.disable("x-powered-by");
@@ -35,7 +37,7 @@ app.set("trust proxy", 1);
 app.use((_, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=()");
   // Telegram Web iframe ichida ochilishi uchun faqat Telegram domenlariga ruxsat
   res.setHeader("Content-Security-Policy",
     "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
@@ -77,7 +79,7 @@ const me = (req: Request) => (req as Authed).user;
 
 function validateQuiz(body: any): { ok: true; data: Pick<Quiz, "title" | "description" | "category" | "isPublic" | "questions"> } | { ok: false; error: string } {
   const title = clean(body?.title, 60), description = clean(body?.description, 140);
-  const category = CATEGORIES.includes(body?.category) ? body.category : "Boshqa";
+  const category = CATEGORIES.includes(body?.category) ? body.category : "Bulutli texnologiyalar";
   if (title.length < 3) return { ok: false, error: "Test nomi kamida 3 belgi bo‘lsin." };
   if (!Array.isArray(body?.questions) || body.questions.length < 1 || body.questions.length > 300)
     return { ok: false, error: "Testda 1 tadan 300 tagacha savol bo‘lishi kerak." };
@@ -102,6 +104,55 @@ const quizCard = (q: Quiz) => ({
 // ---- Ochiq yo'llar ----
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
 app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
+
+// PDF/DOCX importi: fayl server xotirasida tahlil qilinadi, diskka yozilmaydi.
+const uploadQuizFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const name = file.originalname.toLowerCase();
+    const allowed = name.endsWith(".pdf") || name.endsWith(".docx");
+    cb(allowed ? null : new Error("Faqat PDF yoki DOCX fayl yuklash mumkin."), allowed);
+  }
+});
+app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res) => {
+  uploadQuizFile.single("pdf")(req, res, async (uploadError: any) => {
+    if (uploadError) {
+      const tooLarge = uploadError.code === "LIMIT_FILE_SIZE";
+      return res.status(tooLarge ? 413 : 400).json({ error: tooLarge ? "Fayl hajmi 15 MB dan oshmasin." : uploadError.message || "Fayl yuklanmadi." });
+    }
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "PDF yoki DOCX fayl tanlanmagan." });
+    if (!aiEnabled) return res.status(503).json({ error: "Fayl tahlili uchun GEMINI_API_KEY sozlanmagan." });
+    if (!aiVerificationReady) return res.status(503).json({ error: "Javoblarni tekshirish uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY sozlanishi kerak." });
+    if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "Kunlik fayl tahlili limiti tugadi." });
+    try {
+      const isPdf = file.originalname.toLowerCase().endsWith(".pdf");
+      const quiz = isPdf
+        ? await parseQuizPdf(file.buffer)
+        : await (async () => {
+            const extracted = await mammoth.extractRawText({ buffer: file.buffer });
+            return parseQuizDocxText(extracted.value || "");
+          })();
+      if (!quiz) return res.status(422).json({ error: "Fayldan test ajratilmadi yoki AI tekshiruvi yakunlanmadi. Hujjat matnini va AI kalitlarini tekshiring." });
+      return res.json({ quiz: { ...quiz, category: "Bulutli texnologiyalar" }, warning: "AI javoblari uchta model orqali solishtirildi. Saqlashdan oldin savollarni ko‘zdan kechiring." });
+    } catch (error: any) {
+      console.error("Fayl import xatosi:", error);
+      return res.status(500).json({ error: "Faylni tahlil qilishda xatolik yuz berdi." });
+    }
+  });
+});
+
+app.post("/api/ai/verify-quiz", auth, limit(5, 60000), async (req, res) => {
+  if (!aiVerificationReady) return res.status(503).json({ error: "AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY sozlanishi kerak." });
+  const questions = req.body?.questions;
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 300) {
+    return res.status(400).json({ error: "1 tadan 300 tagacha savol yuboring." });
+  }
+  const result = await verifyQuizQuestions(questions);
+  if (!result) return res.status(502).json({ error: "AI tekshiruvi bajarilmadi. Kalitlar va API limitlarini tekshiring." });
+  return res.json(result);
+});
 
 app.post("/api/auth/telegram", limit(30, 60000), (req, res) => {
   const tg = verifyInitData(req.body?.initData, BOT_TOKEN);

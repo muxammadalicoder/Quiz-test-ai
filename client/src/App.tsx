@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home as HomeIcon, Library as LibIcon, Plus, ShieldCheck, Trophy, User as UserIcon, Volume2, VolumeX } from "lucide-react";
+import { Home as HomeIcon, Library as LibIcon, Plus, Search, ShieldCheck, Trophy, User as UserIcon, Volume2, VolumeX } from "lucide-react";
 import { Config, QuizCard, User, api, connectSocket, getToken, inTelegram, setAuthFailHandler, setToken, tg } from "./api";
 import { Avatar, Sheet } from "./ui";
-import { Board, Home, Library, Profile } from "./Screens";
+import { Board, Home, Library, Profile, QuickSearch } from "./Screens";
 import Editor, { Draft, newDraft } from "./Editor";
 import PdfImport from "./PdfImport";
 import Solo from "./Solo";
@@ -12,7 +12,7 @@ import Memorize from "./Memorize";
 import Room, { RoomState } from "./Room";
 import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, startTestMusic, stopBackgroundMusic } from "./sounds";
 
-type Tab = "home" | "library" | "create" | "board" | "profile" | "memorize" | "sections50";
+type Tab = "home" | "library" | "quicksearch" | "create" | "board" | "profile" | "memorize" | "sections50";
 type Mode = "any" | "room" | "solo";
 type Boot = "loading" | "ready" | "login" | "tgonly";
 
@@ -140,6 +140,7 @@ export default function App() {
     switch (tab) {
       case "home": return <Home user={user} go={t => { if (t === "create") setDraft(newDraft()); else if (t === "room" || t === "solo") { setMode(t); setTab("library"); } else { setMode("any"); setTab(t as Tab); } }} openQuiz={q => { setMode("any"); setSheetQuiz(q); }} onJoin={code => socketRef.current?.emit("room:join", { code })} />;
       case "library": return <Library mode={mode} categories={cfg.categories} openQuiz={setSheetQuiz} onCreate={() => setDraft(newDraft())} onImportPdf={() => setPdfImport(true)} refreshKey={libKey} />;
+      case "quicksearch": return <QuickSearch />;
       case "memorize": return <Memorize sectionSize={10} title="Yodlash uchun" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
       case "sections50": return <Memorize sectionSize={50} title="50 talik bo‘limlar" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
       case "board": return <Board me={user} />;
@@ -160,7 +161,7 @@ export default function App() {
       <main><AnimatePresence mode="wait"><motion.div key={room ? "room" : soloId ? "solo" : pdfImport ? "pdf-import" : draft ? "edit" : tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>{view()}</motion.div></AnimatePresence></main>
       {nav && (
         <nav className="tabbar">
-          {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
+          {([["home", HomeIcon, "Bosh"], ["library", LibIcon, "Testlar"], ["quicksearch", Search, "Tez topish"], ["create", Plus, "Yaratish"], ["board", Trophy, "Reyting"], ["profile", UserIcon, "Profil"]] as const).map(([id, I, label]) => (
             <button key={id} className={tab === id && id !== "create" ? "on" : ""} onClick={() => { playClick(); if (id === "create") setDraft(newDraft()); else { if (id === "library") setMode("any"); setTab(id); } }}>
               <span className={id === "create" ? "plus-btn" : ""}><I size={id === "create" ? 22 : 20} /></span><small>{label}</small>
             </button>

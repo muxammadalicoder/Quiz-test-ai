@@ -139,25 +139,58 @@ const normalizeSearch = (value: string) => value
   .replace(/[\u0300-\u036f]/g, "")
   .replace(/[‘’ʻʼ`]/g, "'")
   .toLocaleLowerCase("uz-UZ")
+  .replace(/[^a-z0-9']+/g, " ")
+  .replace(/\s+/g, " ")
   .trim();
 
 app.get("/api/quizzes", auth, (req, res) => {
   const mine = req.query.scope === "mine";
-  const search = normalizeSearch(clean(req.query.q, 80));
-  const list = Object.values(quizzes())
-    .filter(q => (mine ? q.ownerId === me(req).id : q.isPublic || q.ownerId === me(req).id))
-    .filter(q => {
-      if (!search) return true;
-      const searchable = normalizeSearch([
-        q.title, q.category, q.description,
-        ...q.questions.flatMap(question => [question.text, ...question.options])
-      ].join(" "));
-      return searchable.includes(search);
-    })
-    .sort((a, b) => b.plays - a.plays || b.createdAt - a.createdAt)
+  const search = normalizeSearch(clean(req.query.q, 300));
+  const terms = [...new Set(search.split(" ").filter(word => word.length > 1))];
+  const eligible = Object.values(quizzes()).filter(q =>
+    mine ? q.ownerId === me(req).id : q.isPublic || q.ownerId === me(req).id
+  );
+
+  const ranked = eligible.map(q => {
+    const title = normalizeSearch(q.title);
+    const searchable = normalizeSearch([q.title, q.category, q.description,
+      ...q.questions.flatMap(question => [question.text, ...question.options])].join(" "));
+    const matched = terms.filter(term => searchable.includes(term)).length;
+    const coverage = terms.length ? matched / terms.length : 0;
+    const phraseMatch = !!search && searchable.includes(search);
+    const titleMatch = !!search && (title.includes(search) || terms.some(term => title.includes(term)));
+    const score = (phraseMatch ? 10000 : 0) + (titleMatch ? 1000 : 0) + Math.round(coverage * 500) + matched;
+    return { q, score, matched, coverage, phraseMatch };
+  });
+
+  const quizResults = ranked
+    .filter(item => !search || (item.matched > 0 && (item.phraseMatch || item.coverage >= 0.30)))
+    .sort((a, b) => b.score - a.score || b.q.plays - a.q.plays || b.q.createdAt - a.q.createdAt)
     .slice(0, 100)
-    .map(quizCard);
-  res.json({ quizzes: list });
+    .map(item => quizCard(item.q));
+
+  // Qidiruv paytida savolning o‘zi va barcha javob variantlari ko‘rsatiladi.
+  // correctIndex faqat qidiruv natijasida beriladi; oddiy test/o‘yin oqimi o‘zgarmaydi.
+  const questionMatches = search ? eligible.flatMap(q => q.questions.map((question, index) => {
+    const questionText = normalizeSearch(question.text);
+    const optionText = normalizeSearch(question.options.join(" "));
+    const searchableQuestion = normalizeSearch(`${question.text} ${question.options.join(" ")} ${q.title} ${q.category}`);
+    const matched = terms.filter(term => searchableQuestion.includes(term)).length;
+    const coverage = terms.length ? matched / terms.length : 0;
+    const phraseMatch = searchableQuestion.includes(search);
+    const questionPhrase = questionText.includes(search) || optionText.includes(search);
+    const titleOnlyMatch = normalizeSearch(`${q.title} ${q.category}`).includes(search);
+    const score = (questionPhrase ? 10000 : phraseMatch ? 5000 : 0) + matched * 100 + (titleOnlyMatch ? 10 : 0);
+    return { quizId: q.id, quizTitle: q.title, category: q.category, question: question.text,
+      options: question.options, correctIndex: question.correct, score, matched, coverage,
+      phraseMatch, titleOnlyMatch, index: index + 1 };
+  }).filter(item => item.matched > 0 && (item.phraseMatch || item.coverage >= 0.30 || item.titleOnlyMatch)))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 60)
+    .map(({ score, matched, coverage, phraseMatch, titleOnlyMatch, ...item }) => item)
+    : [];
+
+  res.json({ quizzes: quizResults, questionMatches });
 });
 app.get("/api/quizzes/:id", auth, (req, res) => {
   const q = quizzes()[req.params.id];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Hash, Lock, Plus, Search, Swords, Trophy, Users, X } from "lucide-react";
+import { BookOpen, Flame, Hash, Layers, Lock, Search, Swords, X } from "lucide-react";
 import { QuizCard, User, api, inTelegram } from "./api";
 import { AV, Avatar, Empty } from "./ui";
 
@@ -40,9 +40,9 @@ export function Home({ user, onJoin, go, openQuiz }: { user: User; onJoin: (code
       </div>
       <div className="grid2">
         <button className="tile t-purple" onClick={() => go("room")}><Swords size={24} /><b>Ommaviy o‘yin</b><small>Xona oching, do‘stlarni chaqiring</small></button>
-        <button className="tile t-cyan" onClick={() => go("solo")}><Trophy size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
-        <button className="tile t-orange" onClick={() => go("create")}><Plus size={24} /><b>Test yaratish</b><small>O‘z savollaringizni yozing</small></button>
-        <button className="tile t-green" onClick={() => go("board")}><Users size={24} /><b>Reyting</b><small>Eng kuchli o‘yinchilar</small></button>
+        <button className="tile t-cyan" onClick={() => go("solo")}><BookOpen size={24} /><b>Yakka o‘yin</b><small>O‘zingiz bilimingizni sinang</small></button>
+        <button className="tile t-orange" onClick={() => go("memorize")}><BookOpen size={24} /><b>Yodlash uchun</b><small>Testlarni 10 talik bo‘limlarda yodlang</small></button>
+        <button className="tile t-green" onClick={() => go("sections50")}><Layers size={24} /><b>50 talik testlar</b><small>Testlarni 50 tadan ishlang</small></button>
       </div>
       <b className="sec">🔥 Mashhur testlar</b>
       {top.map(q => <QuizItem key={q.id} q={q} onOpen={() => openQuiz(q)} />)}

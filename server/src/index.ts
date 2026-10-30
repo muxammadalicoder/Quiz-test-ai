@@ -112,7 +112,11 @@ const uploadQuizFile = multer({
   fileFilter: (_req, file, cb) => {
     const name = file.originalname.toLowerCase();
     const allowed = name.endsWith(".pdf") || name.endsWith(".docx");
-    cb(allowed ? null : new Error("Faqat PDF yoki DOCX fayl yuklash mumkin."), allowed);
+    if (allowed) {
+      cb(null, true);
+    } else {
+      cb(new Error("Faqat PDF yoki DOCX fayl yuklash mumkin."));
+    }
   }
 });
 app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res) => {

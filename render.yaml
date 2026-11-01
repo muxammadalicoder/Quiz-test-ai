@@ -31,3 +31,17 @@ services:
         value: "5"
       - key: ADMIN_PASSWORD
         sync: false
+      # AI muhandis: tuzatishlarni GitHub'ga yuborish uchun (ixtiyoriy)
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO
+        sync: false
+      - key: GITHUB_BRANCH
+        value: main
+      - key: DEVAI_AUTO_HOURS
+        value: "6"
+      # O'zbekcha server ovozi (ixtiyoriy; Groq o'zbekcha ovoz bermaydi)
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false

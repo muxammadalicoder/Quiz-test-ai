@@ -14,7 +14,7 @@ const LETTERS = ["A", "B", "C", "D"];
 const speechOf = (q: { text: string; options: string[] }, n?: number) =>
   `${n ? `${n}-savol. ` : ""}${q.text.replace(/[.?!]+$/, "")}. Variantlar. ${q.options.map((o, i) => `${LETTERS[i]} variant: ${o.replace(/[.?!]+$/, "")}.`).join(" ")}`;
 
-export default function Solo({ quizId, count, shuffleQuestions = false, talk = false, ai = false, memorizeRange = null, onExit, onUser }: { quizId: string; count: number; shuffleQuestions?: boolean; talk?: boolean; ai?: boolean; memorizeRange?: { start: number; end: number } | null; onExit: () => void; onUser: (u: User) => void }) {
+export default function Solo({ quizId, count, shuffleQuestions = false, talk = false, ai = false, tts = false, memorizeRange = null, onExit, onUser }: { quizId: string; count: number; shuffleQuestions?: boolean; talk?: boolean; ai?: boolean; tts?: boolean; memorizeRange?: { start: number; end: number } | null; onExit: () => void; onUser: (u: User) => void }) {
   const [sid, setSid] = useState(""); const [title, setTitle] = useState(""); const [q, setQ] = useState<Q | null>(null);
   const [res, setRes] = useState<Res | null>(null); const [picked, setPicked] = useState(-1); const [left, setLeft] = useState(0);
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [showFinal, setShowFinal] = useState(false); const [early, setEarly] = useState<Res["finished"] | null>(null);
@@ -29,7 +29,7 @@ export default function Solo({ quizId, count, shuffleQuestions = false, talk = f
   const say = (t: string): Promise<boolean> => {
     const id = ++sayId.current;
     if (!(talk && soundRef.current)) return Promise.resolve(false);
-    return speak(t, ai).then(() => { if (ai && voiceError) setHint("🔇 AI ovozi ishlamadi: " + voiceError); return id === sayId.current; });
+    return speak(t, tts).then(() => { if (tts && voiceError) setHint("🔇 Server ovozi ishlamadi: " + voiceError); return id === sayId.current; });
   };
   const clipRef = useRef<{ stop: () => void } | null>(null);
   const micOk = (ai && canRecord) || canListen;
@@ -131,10 +131,10 @@ export default function Solo({ quizId, count, shuffleQuestions = false, talk = f
     <div className="stack center">
       <div className="big-emoji">🎙️</div><h1 className="big-title">AI bilan suhbat</h1>
       <p className="muted">AI savolni ovoz chiqarib o‘qiydi. Javobni tugma bilan{micOk ? " yoki ovoz bilan" : ""} berasiz{ai && canRecord ? ". Savol o‘qilgach mikrofon o‘zi yoqiladi: javobingizni ayting va jim bo‘ling — AI o‘zi javob beradi" : ""}, AI to‘g‘ri-noto‘g‘riligini aytadi va xatoni tushuntiradi.</p>
-      {!ai && !canSpeak && <p className="err">Bu qurilmada ovoz chiqarish ishlamaydi, savollar faqat yozuv ko‘rinishida chiqadi.</p>}
-      {!ai && canSpeak && voiceInfo && !voiceInfo.exact && <p className="muted">Qurilmangizda o‘zbek ovozi topilmadi{voiceInfo.voice ? `, “${voiceInfo.voice.lang}” ovozi ishlatiladi (talaffuz noaniq bo‘lishi mumkin)` : ""}.</p>}
+      {!tts && !canSpeak && <p className="err">Bu qurilmada ovoz chiqarish ishlamaydi, savollar faqat yozuv ko‘rinishida chiqadi.</p>}
+      {!tts && canSpeak && voiceInfo && !voiceInfo.exact && <p className="muted">Qurilmangizda o‘zbek ovozi topilmadi{voiceInfo.voice ? `, “${voiceInfo.voice.lang}” ovozi ishlatiladi (talaffuz noaniq bo‘lishi mumkin)` : ""}.</p>}
       {!micOk && <p className="muted">Ovozni tanish bu qurilmada yo‘q — javobni tugma bilan bering.</p>}
-      <button className="primary lg" onClick={() => { unlockAudio(); setStarted(true); speak("Boshladik!", ai); }}>▶ Boshlash</button>
+      <button className="primary lg" onClick={() => { unlockAudio(); setStarted(true); speak("Boshladik!", tts); }}>▶ Boshlash</button>
       <button className="ghost" onClick={onExit}>Orqaga</button>
     </div>
   );

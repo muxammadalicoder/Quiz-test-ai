@@ -48,7 +48,7 @@ export default function PdfImport({ categories, onCancel, onDone }: { categories
       <div className="row gap"><FileUp size={25}/><div className="grow"><b>PDF yoki DOCX faylni yuklang</b><small className="muted block">Telefon yoki kompyuterdan · 15 MB gacha · 200 tagacha savol</small></div></div>
       <input type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" onChange={e => { setFile(e.target.files?.[0] || null); setParsed(null); setError(""); }} />
       {file && <small className="muted">Tanlandi: {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</small>}
-      <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> Gemini tahlil qilmoqda…</> : <><Upload size={17}/> Faylni tahlil qilish</>}</button>
+      <button className="primary" disabled={!file || busy} onClick={analyze}>{busy ? <><LoaderCircle className="spin" size={17}/> AI tahlil qilmoqda…</> : <><Upload size={17}/> Faylni tahlil qilish</>}</button>
       <small className="muted">Yuklash biroz vaqt olishi mumkin.Sabr qiling🤌.</small>
     </div>
     {error && <p className="err">{error}</p>}

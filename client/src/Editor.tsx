@@ -59,11 +59,11 @@ export default function Editor({ draft, categories, onDone, onCancel }: { draft:
               <button className="icon-btn danger" disabled={d.questions.length === 1} onClick={() => { if (review) setVerificationStale(true); setD({ ...d, questions: d.questions.filter((_, k) => k !== i) }); }} aria-label="O‘chirish"><Trash2 size={15} /></button>
             </div>
           </div>
-          <textarea rows={2} maxLength={200} placeholder="Savol matni" value={q.text} onChange={e => setQ(i, { text: e.target.value })} />
+          <textarea rows={2} maxLength={400} placeholder="Savol matni" value={q.text} onChange={e => setQ(i, { text: e.target.value })} />
           {q.options.map((o, k) => (
             <div className={`opt c${k}`} key={k}>
               <button type="button" className={`radio ${q.correct === k ? "on" : ""}`} onClick={() => setQ(i, { correct: k })} aria-label="To‘g‘ri javob">{q.correct === k && <Check size={14} />}</button>
-              <input value={o} maxLength={100} placeholder={`${"ABCD"[k]} variant${k > 1 ? " (ixtiyoriy)" : ""}`} onChange={e => setQ(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
+              <input value={o} maxLength={200} placeholder={`${"ABCD"[k]} variant${k > 1 ? " (ixtiyoriy)" : ""}`} onChange={e => setQ(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
             </div>
           ))}
           <label className="inline">Vaqt
@@ -74,7 +74,7 @@ export default function Editor({ draft, categories, onDone, onCancel }: { draft:
       <button className="ghost" disabled={d.questions.length >= 300} onClick={() => { if (review) setVerificationStale(true); setD({ ...d, questions: [...d.questions, blank()] }); }}><Plus size={16} /> Savol qo‘shish</button>
       <div className="card stack">
         <b><ShieldCheck size={16} style={{display:"inline",verticalAlign:"middle"}}/> Uchta AI bilan javoblarni tekshirish</b>
-        <p className="muted">Gemini, GPT va Groq har bir savolni mustaqil yechadi. Kamida ikkita model bir xil javobni tanlamasa, javob avtomatik o‘zgartirilmaydi. Tekshiruv API xarajatini keltirishi mumkin.</p>
+        <p className="muted">Bir nechta AI modeli (Groq, ixtiyoriy Gemini/GPT) har bir savolni mustaqil yechadi. Kamida ikkita model bir xil javobni tanlamasa, javob avtomatik o‘zgartirilmaydi. Tekshiruv API xarajatini keltirishi mumkin.</p>
         <button className="ghost" disabled={checking || busy || d.questions.some(q => !q.text.trim() || q.options.filter(o => o.trim()).length < 2)} onClick={verify}>{checking ? "Uchta AI tekshiryapti…" : "AI bilan tekshirish"}</button>
         {review && <p className={review.reviewCount ? "err" : "muted"}>{review.verifiedCount} ta savol tekshiruvdan o‘tdi. {review.reviewCount} ta savolni qo‘lda ko‘rib chiqing.</p>}
       </div>

@@ -4,7 +4,7 @@ import { api } from "./api";
 import { canRecord, speak, startClip, stopSpeak, unlockAudio, voiceError } from "./voice";
 
 type Message = { role: "user" | "assistant"; text: string };
-export default function Chat({ onExit }: { onExit: () => void }) {
+export default function Chat({ onExit, tts = false }: { onExit: () => void; tts?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([{ role: "assistant", text: "Salom! Men Quiz Arena o‘zbekcha AI yordamchisiman. Savolingizni yozing yoki mikrofon orqali gapiring." }]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,11 +23,10 @@ export default function Chat({ onExit }: { onExit: () => void }) {
     if (trimmed) setMessages(next);
     try {
       const history = messages.slice(-10).map(m => ({ role: m.role, text: m.text }));
-      const d = await api<{ text: string }>("/api/ai/chat", { body: { text: trimmed, audio: audio?.b64, mime: audio?.mime, history } });
-      const updated = [...next, { role: "assistant" as const, text: d.text }];
-      setMessages(updated); setHint("Javobni ovoz chiqarib aytyapman…");
-      await speak(d.text, true);
-      setHint(voiceError ? `Matn tayyor, lekin Gemini ovozi ishlamadi: ${voiceError}` : "");
+      const d = await api<{ text: string; heard?: string }>("/api/ai/chat", { body: { text: trimmed, audio: audio?.b64, mime: audio?.mime, history } });
+      setMessages(prev => [...prev.map(m => (audio && d.heard && m.text === "🎙️ Ovozli xabar" ? { ...m, text: "🎙️ " + d.heard } : m)), { role: "assistant" as const, text: d.text }]); setHint("Javobni ovoz chiqarib aytyapman…");
+      await speak(d.text, tts);
+      setHint(voiceError ? `Matn tayyor, lekin ovoz ishlamadi: ${voiceError}` : "");
     } catch (e: any) { setHint(e?.message || "Ulanishda xato yuz berdi."); }
     finally { setBusy(false); }
   }
@@ -50,7 +49,7 @@ export default function Chat({ onExit }: { onExit: () => void }) {
   return <section className="stack" style={{ minHeight: "65vh" }}>
     <div className="row between center-row"><button className="ghost sm" onClick={onExit}><ArrowLeft size={16}/> Orqaga</button><b>🎙 O‘zbekcha AI suhbat</b><button className="icon-btn" aria-label="Ovozni to‘xtatish" onClick={stopSpeak}><Square size={15}/></button></div>
     <div className="stack" style={{ flex: 1, maxHeight: "55vh", overflowY: "auto", padding: 4 }}>
-      {messages.map((m, i) => <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", padding: "10px 13px", borderRadius: 14, background: m.role === "user" ? "var(--accent, #343b70)" : "var(--panel, #171a2b)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.text}{m.role === "assistant" && <button className="icon-btn" title="Ovozda qayta eshitish" onClick={() => { unlockAudio(); speak(m.text, true).then(() => setHint(voiceError ? "Gemini ovozi ishlamadi: " + voiceError : "")); }}><Volume2 size={14}/></button>}</div>)}
+      {messages.map((m, i) => <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", padding: "10px 13px", borderRadius: 14, background: m.role === "user" ? "var(--accent, #343b70)" : "var(--panel, #171a2b)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.text}{m.role === "assistant" && <button className="icon-btn" title="Ovozda qayta eshitish" onClick={() => { unlockAudio(); speak(m.text, tts).then(() => setHint(voiceError ? "Ovoz ishlamadi: " + voiceError : "")); }}><Volume2 size={14}/></button>}</div>)}
       <div ref={bottomRef}/>
     </div>
     {hint && <small className="muted center-t">{hint}</small>}
@@ -59,6 +58,6 @@ export default function Chat({ onExit }: { onExit: () => void }) {
       <button className={`icon-btn ${recording ? "on" : ""}`} type="button" aria-label={recording ? "Yozuvni tugatish" : "Ovoz yozish"} disabled={busy} onClick={toggleMic}>{recording ? <Square size={18}/> : <Mic size={18}/>}</button>
       <button className="primary" type="submit" disabled={busy || !draft.trim()} aria-label="Yuborish"><Send size={17}/></button>
     </form>
-    <small className="muted center-t">Ovoz Gemini API orqali yaratiladi. API xato bersa, brauzerning turkcha ovoziga avtomatik o‘tmaydi.</small>
+    <small className="muted center-t">Javoblar Groq AI orqali yaratiladi. Ovoz: server ovozi yoqilgan bo‘lsa o‘zbekcha, aks holda qurilmangiz ovozi ishlatiladi.</small>
   </section>;
 }

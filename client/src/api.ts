@@ -16,7 +16,7 @@ export type QuizCard = {
   plays: number; ownerId: string; owner: string; createdAt: number;
 };
 export type EQuestion = { text: string; options: string[]; correct: number; time: number };
-export type Config = { ai?: boolean; guest: boolean; categories: string[]; reactions: string[]; bot?: string };
+export type Config = { ai?: boolean; tts?: boolean; chat?: boolean; dev?: boolean; guest: boolean; categories: string[]; reactions: string[]; bot?: string };
 
 const KEY = "quiz-arena-token";
 export const getToken = () => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } };

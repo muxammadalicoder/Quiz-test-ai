@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Flame, Hash, Layers, Lock, Search, Swords, X } from "lucide-react";
+import { BookOpen, Flame, Hash, Layers, Lock, Plus, Search, Swords, X } from "lucide-react";
 import { QuizCard, User, api, inTelegram } from "./api";
 import { AV, Avatar, Empty } from "./ui";
 
@@ -67,7 +67,7 @@ export function Library({ mode, categories, openQuiz, onCreate, onImportPdf, ref
         : shown.length ? <><small className="muted">Topildi: {shown.length} ta test</small>{shown.map(x => <QuizItem key={x.id} q={x} mine={scope === "mine"} onOpen={() => openQuiz(x)} />)}</>
         : <Empty icon="🗂️" text={scope === "mine" ? "Hali test yaratmagansiz." : "Hozircha testlar topilmadi."} />}
       {scope === "mine" && <button className="primary" onClick={onCreate}><Plus size={16} /> Yangi test</button>}
-      {mode === "any" && <button className="ghost" onClick={onImportPdf}>📄 PDF orqali test yuklash (Gemini AI)</button>}
+      {mode === "any" && <button className="ghost" onClick={onImportPdf}>📄 PDF/DOCX orqali test yuklash (AI)</button>}
     </div>
   );
 }
@@ -135,7 +135,7 @@ export function Board({ me }: { me: User }) {
   );
 }
 
-export function Profile({ user, onSave, onLogout }: { user: User; onSave: (u: User) => void; onLogout: () => void }) {
+export function Profile({ user, onSave, onLogout, onChat, onDev }: { user: User; onSave: (u: User) => void; onLogout: () => void; onChat?: () => void; onDev?: () => void }) {
   const [name, setName] = useState(user.name); const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
   async function patch(body: object) {
     setErr(""); setMsg("");
@@ -163,6 +163,9 @@ export function Profile({ user, onSave, onLogout }: { user: User; onSave: (u: Us
             );
           })}
         </div></div>
+      {(onChat || onDev) && <div className="card stack"><b className="sec">AI</b>
+        {onChat && <button className="ghost" onClick={onChat}>🎙 AI bilan suhbat</button>}
+        {onDev && <button className="ghost" onClick={onDev}>🛠 AI muhandis (admin)</button>}</div>}
       {msg && <p className="ok">{msg}</p>}{err && <p className="err">{err}</p>}
       {!inTelegram && <button className="ghost" onClick={onLogout}>Chiqish</button>}
     </div>

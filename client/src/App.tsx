@@ -8,11 +8,13 @@ import { Board, Home, Library, Profile, QuickSearch } from "./Screens";
 import Editor, { Draft, newDraft } from "./Editor";
 import PdfImport from "./PdfImport";
 import Solo from "./Solo";
+import Chat from "./Chat";
+import DevAi from "./DevAi";
 import Memorize from "./Memorize";
 import Room, { RoomState } from "./Room";
 import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, startTestMusic, stopBackgroundMusic } from "./sounds";
 
-type Tab = "home" | "library" | "quicksearch" | "create" | "board" | "profile" | "memorize" | "sections50";
+type Tab = "home" | "library" | "quicksearch" | "create" | "board" | "profile" | "memorize" | "sections50" | "chat" | "devai";
 type Mode = "any" | "room" | "solo";
 type Boot = "loading" | "ready" | "login" | "tgonly";
 
@@ -134,7 +136,7 @@ export default function App() {
 
   const view = () => {
     if (room && socketRef.current) return <Room s={room} userId={user.id} socket={socketRef.current} bot={cfg.bot} reactions={cfg.reactions} />;
-    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={shuffleQuestions} talk={talk} ai={!!cfg.ai} memorizeRange={(tab === "memorize" || tab === "sections50") ? memorizeRange : null} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
+    if (soloId) return <Solo quizId={soloId} count={count} shuffleQuestions={(tab === "memorize" || tab === "sections50") ? false : shuffleQuestions} talk={talk} ai={!!cfg.ai} tts={!!cfg.tts} memorizeRange={(tab === "memorize" || tab === "sections50") ? memorizeRange : null} onExit={() => { setSoloId(""); setMemorizeRange(null); }} onUser={setUser} />;
     if (pdfImport) return <PdfImport categories={cfg.categories} onCancel={() => setPdfImport(false)} onDone={() => { setPdfImport(false); setTab("library"); setLibKey(k => k + 1); say("PDF testlari saqlandi ✓"); }} />;
     if (draft) return <Editor draft={draft} categories={cfg.categories} onCancel={() => setDraft(null)} onDone={() => { setDraft(null); setTab("library"); setLibKey(k => k + 1); say("Test saqlandi ✓"); }} />;
     switch (tab) {
@@ -144,7 +146,9 @@ export default function App() {
       case "memorize": return <Memorize sectionSize={10} title="Yodlash uchun" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
       case "sections50": return <Memorize sectionSize={50} title="50 talik bo‘limlar" onStart={(id, start, end) => { setCount(0); setTalk(false); setMemorizeRange({ start, end }); setSoloId(id); }} />;
       case "board": return <Board me={user} />;
-      case "profile": return <Profile user={user} onSave={setUser} onLogout={logout} />;
+      case "profile": return <Profile user={user} onSave={setUser} onLogout={logout} onChat={cfg.chat ? () => setTab("chat") : undefined} onDev={cfg.dev ? () => setTab("devai") : undefined} />;
+      case "chat": return <Chat onExit={() => setTab("profile")} tts={!!cfg.tts} />;
+      case "devai": return <DevAi onExit={() => setTab("profile")} />;
       default: return null;
     }
   };

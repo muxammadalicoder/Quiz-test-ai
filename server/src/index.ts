@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { OPT_MAX, Q_MAX, aiAllowed, aiEnabled, aiVerificationReady, chatReply, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, ttsEnabled, verifyQuizQuestions } from "./ai.js";
+import { OPT_MAX, Q_MAX, aiAllowed, aiEnabled, aiVerificationReady, chatReply, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, ttsReady, verifyQuizQuestions } from "./ai.js";
 import { groqEnabled, groqLastError, groqTranscribe } from "./groq.js";
 import { installErrorCapture, recordError, registerDevAi, startDevAi } from "./devai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
@@ -109,7 +109,7 @@ const quizCard = (q: Quiz) => ({
 
 // ---- Ochiq yo'llar ----
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
-app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, tts: ttsEnabled, chat: groqEnabled, dev: !!process.env.ADMIN_PASSWORD, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
+app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, tts: ttsReady(), chat: groqEnabled, dev: !!process.env.ADMIN_PASSWORD, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
 
 // PDF/DOCX importi: fayl server xotirasida tahlil qilinadi, diskka yozilmaydi.
 const uploadQuizFile = multer({
@@ -409,15 +409,15 @@ app.post("/api/solo/finish", auth, (req, res) => {
 });
 const AUDIO_MIMES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/aac"];
 app.post("/api/ai/tts", auth, limit(40, 60000), async (req, res) => {
-  if (!ttsEnabled) return res.status(503).json({ error: "Server ovozi yoqilmagan (AZURE_SPEECH_KEY yoki GEMINI_API_KEY kerak); brauzer ovozi ishlatiladi." });
+  if (!ttsReady()) return res.status(503).json({ error: "Server ovozi mavjud emas; brauzer ovozi ishlatiladi." });
   const text = clean(req.body?.text, 600);
   if (!text) return res.status(400).json({ error: "Matn bo‘sh." });
   try {
-    const hit = ttsCached(text); if (hit) return res.json({ audio: hit });
+    const hit = ttsCached(text); if (hit) return res.json(hit);
     if (!aiAllowed(me(req).id, "tts")) return res.status(429).json({ error: "Bugungi ovoz limiti tugadi." });
-    const audio = await tts(text);
-    if (!audio) return res.status(502).json({ error: "Ovoz yaratilmadi." });
-    res.json({ audio });
+    const out = await tts(text);
+    if (!out) return res.status(502).json({ error: "Ovoz yaratilmadi." });
+    res.json(out);
   } catch (e) { console.error("TTS yo‘li xatosi:", e); res.status(500).json({ error: "Ovoz yaratishda xatolik." }); }
 });
 app.post("/api/ai/listen", auth, limit(40, 60000), async (req, res) => {

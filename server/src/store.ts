@@ -94,3 +94,22 @@ export function seedQuizzes() {
   }
   if (changed) save();
 }
+
+/** Ichki xizmat ma'lumotlari (AI muhandis jurnali/hisoboti) — asosiy bazadan alohida kalitda saqlanadi. */
+export async function kvLoad(key: string): Promise<any | null> {
+  try {
+    if (pool) { const r = await pool.query("select value from kv where key = $1", [key]); return r.rows[0]?.value ?? null; }
+    const f = resolve(DATA_DIR, key.replace(/[^a-z0-9_-]/gi, "_") + ".json");
+    return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;
+  } catch { return null; }
+}
+export async function kvSave(key: string, value: unknown): Promise<void> {
+  try {
+    if (pool) {
+      await pool.query("insert into kv(key, value) values ($1, $2) on conflict (key) do update set value = excluded.value, updated_at = now()", [key, JSON.stringify(value)]);
+      return;
+    }
+    mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(resolve(DATA_DIR, key.replace(/[^a-z0-9_-]/gi, "_") + ".json"), JSON.stringify(value));
+  } catch (e) { console.error("kvSave xatosi:", e); }
+}

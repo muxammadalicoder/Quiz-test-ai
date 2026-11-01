@@ -10,9 +10,12 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { aiAllowed, aiEnabled, aiVerificationReady, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, verifyQuizQuestions } from "./ai.js";
+import { OPT_MAX, Q_MAX, aiAllowed, aiEnabled, aiVerificationReady, chatReply, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, ttsEnabled, verifyQuizQuestions } from "./ai.js";
+import { groqEnabled, groqLastError, groqTranscribe } from "./groq.js";
+import { installErrorCapture, recordError, registerDevAi, startDevAi } from "./devai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
 
+installErrorCapture(); // server xatolari AI muhandis jurnaliga yoziladi
 const PORT = Number(process.env.PORT || 3001);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const ALLOW_GUEST = process.env.ALLOW_GUEST ? process.env.ALLOW_GUEST === "true" : !BOT_TOKEN;
@@ -64,6 +67,9 @@ setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (now -
 // ---- Yordamchilar ----
 const clean = (v: unknown, max: number) =>
   typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
+/** Test matni uchun: boshqaruv belgilari olib tashlanadi, lekin < > -> kabi belgilar saqlanadi (React ularni xavfsiz ko‘rsatadi). */
+const cleanText = (v: unknown, max: number) =>
+  typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
 const cleanName = (v: unknown) => { const s = clean(v, 18); return s.length >= 2 ? s : ""; };
 type Authed = Request & { user: User };
 function auth(req: Request, res: Response, next: NextFunction) {
@@ -78,15 +84,15 @@ function auth(req: Request, res: Response, next: NextFunction) {
 const me = (req: Request) => (req as Authed).user;
 
 function validateQuiz(body: any): { ok: true; data: Pick<Quiz, "title" | "description" | "category" | "isPublic" | "questions"> } | { ok: false; error: string } {
-  const title = clean(body?.title, 60), description = clean(body?.description, 140);
+  const title = cleanText(body?.title, 60), description = cleanText(body?.description, 140);
   const category = CATEGORIES.includes(body?.category) ? body.category : "Bulutli texnologiyalar";
   if (title.length < 3) return { ok: false, error: "Test nomi kamida 3 belgi bo‘lsin." };
   if (!Array.isArray(body?.questions) || body.questions.length < 1 || body.questions.length > 300)
     return { ok: false, error: "Testda 1 tadan 300 tagacha savol bo‘lishi kerak." };
   const questions: Question[] = [];
   for (const [i, q] of body.questions.entries()) {
-    const text = clean(q?.text, 200);
-    const options = Array.isArray(q?.options) ? q.options.map((o: unknown) => clean(o, 100)).filter(Boolean).slice(0, 4) : [];
+    const text = cleanText(q?.text, Q_MAX);
+    const options = Array.isArray(q?.options) ? q.options.map((o: unknown) => cleanText(o, OPT_MAX)).filter(Boolean).slice(0, 4) : [];
     const correct = Number(q?.correct), time = Math.round(Number(q?.time) || 20);
     if (!text) return { ok: false, error: `${i + 1}-savol matni bo‘sh.` };
     if (options.length < 2) return { ok: false, error: `${i + 1}-savolda kamida 2 ta variant bo‘lsin.` };
@@ -103,7 +109,7 @@ const quizCard = (q: Quiz) => ({
 
 // ---- Ochiq yo'llar ----
 app.get("/health", (_q, r) => { r.json({ status: "ok" }); });
-app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
+app.get("/api/config", (_q, r) => { r.json({ ai: aiEnabled, tts: ttsEnabled, chat: groqEnabled, dev: !!process.env.ADMIN_PASSWORD, guest: ALLOW_GUEST, categories: CATEGORIES, reactions: REACTIONS, bot: process.env.BOT_USERNAME || "" }); });
 
 // PDF/DOCX importi: fayl server xotirasida tahlil qilinadi, diskka yozilmaydi.
 const uploadQuizFile = multer({
@@ -127,8 +133,8 @@ app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res) => {
     }
     const file = req.file;
     if (!file) return res.status(400).json({ error: "PDF yoki DOCX fayl tanlanmagan." });
-    if (!aiEnabled) return res.status(503).json({ error: "Fayl tahlili uchun GEMINI_API_KEY sozlanmagan." });
-    if (!aiVerificationReady) return res.status(503).json({ error: "Javoblarni tekshirish uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY sozlanishi kerak." });
+    if (!aiEnabled) return res.status(503).json({ error: "Fayl tahlili uchun GROQ_API_KEY (yoki GEMINI_API_KEY) sozlanmagan." });
+    if (!aiVerificationReady) return res.status(503).json({ error: "Javoblarni tekshirish uchun kamida ikkita tekshiruvchi kerak. GROQ_API_KEY yetarli (u ikkita model ishlatadi); ixtiyoriy: GEMINI_API_KEY, OPENAI_API_KEY." });
     if (!aiAllowed(me(req).id, "pdf")) return res.status(429).json({ error: "Kunlik fayl tahlili limiti tugadi." });
     try {
       const isPdf = file.originalname.toLowerCase().endsWith(".pdf");
@@ -139,7 +145,7 @@ app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res) => {
             return parseQuizDocxText(extracted.value || "");
           })();
       if (!quiz) return res.status(422).json({ error: "Fayldan test ajratilmadi yoki AI tekshiruvi yakunlanmadi. Hujjat matnini va AI kalitlarini tekshiring." });
-      return res.json({ quiz: { ...quiz, category: "Bulutli texnologiyalar" }, warning: "AI javoblari uchta model orqali solishtirildi. Saqlashdan oldin savollarni ko‘zdan kechiring." });
+      return res.json({ quiz: { ...quiz, category: "Bulutli texnologiyalar" }, warning: "AI javoblari bir nechta model orqali solishtirildi. Saqlashdan oldin savollarni ko‘zdan kechiring." });
     } catch (error: any) {
       console.error("Fayl import xatosi:", error);
       return res.status(500).json({ error: "Faylni tahlil qilishda xatolik yuz berdi." });
@@ -148,14 +154,17 @@ app.post("/api/quizzes/import-pdf", auth, limit(5, 60000), (req, res) => {
 });
 
 app.post("/api/ai/verify-quiz", auth, limit(5, 60000), async (req, res) => {
-  if (!aiVerificationReady) return res.status(503).json({ error: "AI tekshiruvi uchun GEMINI_API_KEY, OPENAI_API_KEY va GROQ_API_KEY sozlanishi kerak." });
+  if (!aiVerificationReady) return res.status(503).json({ error: "AI tekshiruvi uchun kamida ikkita tekshiruvchi kerak. GROQ_API_KEY yetarli; ixtiyoriy: GEMINI_API_KEY, OPENAI_API_KEY." });
   const questions = req.body?.questions;
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 300) {
     return res.status(400).json({ error: "1 tadan 300 tagacha savol yuboring." });
   }
-  const result = await verifyQuizQuestions(questions);
-  if (!result) return res.status(502).json({ error: "AI tekshiruvi bajarilmadi. Kalitlar va API limitlarini tekshiring." });
-  return res.json(result);
+  if (!aiAllowed(me(req).id, "verify")) return res.status(429).json({ error: "Bugungi AI tekshiruv limiti tugadi. Ertaga qayta urinib ko‘ring." });
+  try {
+    const result = await verifyQuizQuestions(questions);
+    if (!result) return res.status(502).json({ error: "AI tekshiruvi bajarilmadi. Kalitlar va API limitlarini tekshiring." });
+    return res.json(result);
+  } catch (e) { console.error("verify-quiz xatosi:", e); return res.status(500).json({ error: "AI tekshiruvida xatolik yuz berdi." }); }
 });
 
 app.post("/api/auth/telegram", limit(30, 60000), (req, res) => {
@@ -324,11 +333,23 @@ function award(u: User, score: number, rank: number | null, solo: boolean) {
 // ---- Tasodifiy savollar: 20/25/30 ta (yoki hammasi), savollar va variantlar aralashtiriladi ----
 const COUNTS = [20, 25, 30];
 function shuffle<T>(a: T[]): T[] { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = randomInt(i + 1); [r[i], r[j]] = [r[j], r[i]]; } return r; }
-function pick(quiz: Quiz, count: unknown): Quiz {
-  const n = COUNTS.includes(Number(count)) ? Number(count) : quiz.questions.length;
-  const qs = shuffle(quiz.questions).slice(0, n).map(q => {
-    const order = shuffle(q.options.map((_, i) => i));
-    return { ...q, options: order.map(i => q.options[i]), correct: order.indexOf(q.correct) };
+type PickOpts = { count?: unknown; shuffle?: boolean; start?: unknown; end?: unknown };
+/**
+ * O'yin uchun savollarni tanlaydi:
+ *  - start/end berilsa ("Yodlash uchun" va "50 talik testlar"): faqat shu oraliq, asl tartibda;
+ *  - aks holda count (20/25/30) berilsa: tasodifiy shuncha savol; 0 bo'lsa hammasi;
+ *  - shuffle=true bo'lsa savollar tartibi aralashtiriladi, bo'lmasa testdagi asl tartibda.
+ * Variantlar har doim aralashtiriladi (to'g'ri javob doim A bo'lib qolmasligi uchun).
+ */
+function pick(quiz: Quiz, o: PickOpts = {}): Quiz {
+  let idx = quiz.questions.map((_, i) => i);
+  const s = Number(o.start), e = Number(o.end);
+  if (Number.isInteger(s) && Number.isInteger(e) && s >= 0 && e > s && s < idx.length) idx = idx.slice(s, Math.min(e, idx.length));
+  else if (COUNTS.includes(Number(o.count)) && Number(o.count) < idx.length) idx = shuffle(idx).slice(0, Number(o.count)).sort((a, b) => a - b);
+  if (o.shuffle === true) idx = shuffle(idx);
+  const qs = idx.map(i => {
+    const q = quiz.questions[i]; const order = shuffle(q.options.map((_, k) => k));
+    return { ...q, options: order.map(k => q.options[k]), correct: order.indexOf(q.correct) };
   });
   return { ...quiz, questions: qs };
 }
@@ -347,7 +368,7 @@ app.post("/api/solo/start", auth, limit(40, 60000), (req, res) => {
   const quiz = quizzes()[String(req.body?.quizId)];
   if (!quiz || (!quiz.isPublic && quiz.ownerId !== me(req).id)) return res.status(404).json({ error: "Test topilmadi." });
   const sid = uid() + uid();
-  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, req.body?.count), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
+  const s: Solo = { talk: !!req.body?.talk, log: [], userId: me(req).id, quiz: pick(quiz, { count: req.body?.count, shuffle: req.body?.shuffleQuestions === true, start: req.body?.rangeStart, end: req.body?.rangeEnd }), i: 0, score: 0, streak: 0, correct: 0, sentAt: 0, answered: false, touched: Date.now() };
   solos.set(sid, s);
   res.json({ sid, title: quiz.title, question: soloQ(s) });
 });
@@ -388,25 +409,52 @@ app.post("/api/solo/finish", auth, (req, res) => {
 });
 const AUDIO_MIMES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/aac"];
 app.post("/api/ai/tts", auth, limit(40, 60000), async (req, res) => {
-  if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq." });
+  if (!ttsEnabled) return res.status(503).json({ error: "Server ovozi yoqilmagan (AZURE_SPEECH_KEY yoki GEMINI_API_KEY kerak); brauzer ovozi ishlatiladi." });
   const text = clean(req.body?.text, 600);
   if (!text) return res.status(400).json({ error: "Matn bo‘sh." });
-  const hit = ttsCached(text); if (hit) return res.json({ audio: hit });
-  if (!aiAllowed(me(req).id, "tts")) return res.status(429).json({ error: "Bugungi ovoz limiti tugadi." });
-  const audio = await tts(text);
-  if (!audio) return res.status(502).json({ error: "Ovoz yaratilmadi." });
-  res.json({ audio });
+  try {
+    const hit = ttsCached(text); if (hit) return res.json({ audio: hit });
+    if (!aiAllowed(me(req).id, "tts")) return res.status(429).json({ error: "Bugungi ovoz limiti tugadi." });
+    const audio = await tts(text);
+    if (!audio) return res.status(502).json({ error: "Ovoz yaratilmadi." });
+    res.json({ audio });
+  } catch (e) { console.error("TTS yo‘li xatosi:", e); res.status(500).json({ error: "Ovoz yaratishda xatolik." }); }
 });
 app.post("/api/ai/listen", auth, limit(40, 60000), async (req, res) => {
   if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq." });
   const audio = typeof req.body?.audio === "string" ? req.body.audio : "";
   const mime = String(req.body?.mime || "").split(";")[0].trim().toLowerCase();
-  const options = Array.isArray(req.body?.options) ? req.body.options.slice(0, 4).map((o: unknown) => clean(o, 100)) : [];
+  const options = Array.isArray(req.body?.options) ? req.body.options.slice(0, 4).map((o: unknown) => cleanText(o, OPT_MAX)) : [];
   if (!audio || audio.length > 900000 || !AUDIO_MIMES.includes(mime) || options.length < 2) return res.status(400).json({ error: "Noto‘g‘ri so‘rov." });
   if (!aiAllowed(me(req).id, "listen")) return res.status(429).json({ error: "Bugungi ovoz tanish limiti tugadi." });
-  const out = await listenChoice(audio, mime, options);
-  if (!out) return res.status(502).json({ error: "Ovoz tushunilmadi." });
-  res.json(out);
+  try {
+    const out = await listenChoice(audio, mime, options);
+    if (!out) return res.status(502).json({ error: groqLastError || "Ovoz tushunilmadi." });
+    res.json(out);
+  } catch (e) { console.error("Ovoz tanish xatosi:", e); res.status(500).json({ error: "Ovozni tanishda xatolik." }); }
+});
+// Erkin suhbat (Chat oynasi): matn yoki ovoz → Groq (Whisper + LLM), sof o'zbekcha javob
+app.post("/api/ai/chat", auth, limit(30, 60000), async (req, res) => {
+  if (!groqEnabled) return res.status(503).json({ error: "AI suhbat uchun GROQ_API_KEY kerak." });
+  if (!aiAllowed(me(req).id, "chat")) return res.status(429).json({ error: "Bugungi suhbat limiti tugadi." });
+  try {
+    let text = cleanText(req.body?.text, 800); let heard = "";
+    const audio = typeof req.body?.audio === "string" ? req.body.audio : "";
+    if (!text && audio) {
+      const mime = String(req.body?.mime || "").split(";")[0].trim().toLowerCase();
+      if (audio.length > 900000 || !AUDIO_MIMES.includes(mime)) return res.status(400).json({ error: "Noto‘g‘ri ovoz." });
+      const t = await groqTranscribe(Buffer.from(audio, "base64"), mime);
+      if (t === null) return res.status(502).json({ error: groqLastError || "Ovoz tushunilmadi." });
+      if (!t) return res.status(422).json({ error: "Ovoz eshitilmadi. Qayta urinib ko‘ring." });
+      text = cleanText(t, 800); heard = text;
+    }
+    if (!text) return res.status(400).json({ error: "Xabar bo‘sh." });
+    const history = (Array.isArray(req.body?.history) ? req.body.history : []).slice(-10)
+      .map((m: any) => ({ role: m?.role === "assistant" ? "assistant" as const : "user" as const, text: cleanText(m?.text, 600) })).filter((m: { text: string }) => m.text);
+    const reply = await chatReply(history, text);
+    if (!reply) return res.status(502).json({ error: groqLastError || "AI javob bermadi." });
+    res.json({ text: reply, heard });
+  } catch (e) { console.error("AI suhbat xatosi:", e); res.status(500).json({ error: "AI suhbatda xatolik yuz berdi." }); }
 });
 app.post("/api/solo/next", auth, (req, res) => {
   const s = solos.get(String(req.body?.sid));
@@ -517,7 +565,7 @@ io.on("connection", (socket: Socket) => {
     if (roomOf(userId)) return err("Siz allaqachon xonadasiz.");
     const quiz = quizzes()[String(b.quizId)];
     if (!quiz || (!quiz.isPublic && quiz.ownerId !== userId)) return err("Test topilmadi.");
-    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, b.count), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
+    const r: Room = { code: code(), hostId: userId, quiz: pick(quiz, { count: b.count, shuffle: b.shuffleQuestions === true }), players: new Map(), banned: new Set(), status: "lobby", i: -1, endsAt: 0, startedAt: Date.now() };
     r.players.set(userId, { picks: {}, userId, score: 0, streak: 0, connected: true, lastSeen: Date.now() });
     rooms.set(r.code, r); push(r);
   });
@@ -575,13 +623,24 @@ io.on("connection", (socket: Socket) => {
   });
 });
 
+// ---- AI muhandis (faqat ADMIN_PASSWORD bilan) ----
+registerDevAi(app, { auth, limit });
+
 // ---- Frontend (production) ----
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../../client/dist");
 if (existsSync(dist)) {
   app.use(express.static(dist, { maxAge: "1h" }));
   app.get("*", (req, res, next) => (req.path.startsWith("/api") ? next() : res.sendFile(resolve(dist, "index.html"))));
 }
+// Kutilmagan xatolar: jurnalga yoziladi (AI muhandis ko'radi), foydalanuvchiga umumiy xabar qaytadi
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  const status = Number(err?.status) >= 400 && Number(err?.status) < 500 ? Number(err.status) : err?.message === "CORS" ? 403 : 500;
+  if (status >= 500) recordError("server", `${req.method} ${req.path}: ${err?.stack || err?.message || err}`);
+  if (res.headersSent) return;
+  res.status(status).json({ error: status >= 500 ? "Serverda xatolik yuz berdi." : "Noto‘g‘ri so‘rov." });
+});
 await initStore();
 seedQuizzes();
+void startDevAi();
 server.listen(PORT, () => { console.log(`Quiz Arena: http://localhost:${PORT}`); startBot(); });
 for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { setTimeout(() => process.exit(0), 4000).unref(); Promise.resolve(flushNow()).finally(() => process.exit(0)); });

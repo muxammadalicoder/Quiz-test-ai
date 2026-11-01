@@ -30,6 +30,7 @@
     "node": ">=20"
   },
   "optionalDependencies": {
-    "pdf-parse": "1.1.1"
+    "pdf-parse": "1.1.1",
+    "msedge-tts": "^2.0.4"
   }
 }

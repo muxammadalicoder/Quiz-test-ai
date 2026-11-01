@@ -137,11 +137,14 @@ async function ttsAzure(text: string): Promise<string | null> {
       body: ssml
     });
     clearTimeout(t);
-    if (!r.ok) { console.error("Azure TTS xato:", r.status, (await r.text().catch(() => "")).slice(0, 200)); return null; }
+    if (!r.ok) { console.error("Azure TTS xato:", r.status, (await r.text().catch(() => "")).slice(0, 200)); ttsErr += ` Azure: ${r.status}.`; return null; }
     return Buffer.from(await r.arrayBuffer()).toString("base64");
   } catch (e) { clearTimeout(t); console.error("Azure TTS so'rov xatosi:", String(e)); return null; }
 }
 /** Microsoft Edge "o'qib berish" xizmati (msedge-tts paketi): kalitsiz, uz-UZ-MadinaNeural / uz-UZ-SardorNeural. Norasmiy, shuning uchun zaxira sifatida. */
+let ttsErr = "";
+/** Oxirgi ovoz yaratish urinishlari nega yiqilgani (ekranda ko'rsatiladi). */
+export const ttsLastError = () => ttsErr.trim().slice(0, 220);
 const edgeAllowed = process.env.TTS_EDGE !== "off";
 let edgeBroken = false; // paket o'rnatilmagan bo'lsa qayta urinmaymiz
 async function ttsEdge(text: string): Promise<string | null> {
@@ -164,17 +167,48 @@ async function ttsEdge(text: string): Promise<string | null> {
     const msg = String(e);
     if (/Cannot find|MODULE_NOT_FOUND/i.test(msg)) edgeBroken = true;
     console.error("Edge TTS xatosi:", msg.slice(0, 200));
+    ttsErr += ` Edge: ${msg.replace(/^Error:\s*/, "").slice(0, 90)}.`;
     return null;
   }
 }
 
+/** Uzun matnni gap/so'z chegarasida bo'laklarga ajratadi. */
+function splitForTts(text: string, max: number): string[] {
+  const out: string[] = []; let cur = "";
+  for (const w of text.split(/(?<=[.!?,;:])\s+|\s+/)) {
+    if (!w) continue;
+    if ((cur + " " + w).trim().length > max && cur) { out.push(cur.trim()); cur = w; } else cur = (cur + " " + w).trim();
+  }
+  if (cur) out.push(cur.trim());
+  return out;
+}
+/** Google Translate o'zbekcha ovozi: norasmiy, sifati oddiyroq, lekin to'g'ri o'zbekcha talaffuz. TTS_GTRANSLATE=off bilan o'chiriladi. */
+async function ttsGoogle(text: string): Promise<string | null> {
+  if (process.env.TTS_GTRANSLATE === "off") return null;
+  const spoken = text.replace(/[\u2018\u2019\u02BB\u02BC`\u00B4]/g, "'");
+  const bufs: any[] = [];
+  try {
+    for (const part of splitForTts(spoken, 180).slice(0, 6)) {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 12000);
+      const r = await fetch(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=uz&q=${encodeURIComponent(part)}`, { signal: ctrl.signal, headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36" } });
+      clearTimeout(t);
+      if (!r.ok) { ttsErr += ` Google: ${r.status}.`; return null; }
+      bufs.push(Buffer.from(await r.arrayBuffer()));
+    }
+    const buf = Buffer.concat(bufs);
+    return buf.length > 200 ? buf.toString("base64") : null;
+  } catch (e) { ttsErr += ` Google: ${String(e).slice(0, 60)}.`; console.error("Google TTS xatosi:", String(e).slice(0, 150)); return null; }
+}
+
 export type TtsOut = { audio: string; mime: string };
-/** Ovoz yaratish tartibi: Azure (kalit bor bo'lsa) → Edge (bepul) → Gemini. */
+/** Ovoz yaratish tartibi: Azure (kalit bor bo'lsa) → Edge (bepul) → Google Translate → Gemini. */
 export async function tts(text: string): Promise<TtsOut | null> {
   const hit = cache.get(text); if (hit) return hit;
+  ttsErr = "";
   const keep = (o: TtsOut) => { if (cache.size > 300) cache.delete(cache.keys().next().value as string); if (text.length <= 80) cache.set(text, o); return o; };
   if (AZ_KEY && AZ_REGION) { const a = await ttsAzure(text); if (a) return keep({ audio: a, mime: "audio/wav" }); }
   const e = await ttsEdge(text); if (e) return keep({ audio: e, mime: "audio/mpeg" });
+  const gg = await ttsGoogle(text); if (gg) return keep({ audio: gg, mime: "audio/mpeg" });
   if (KEY) { const g = await ttsGemini(text); if (g) return keep({ audio: g, mime: "audio/wav" }); }
   return null;
 }

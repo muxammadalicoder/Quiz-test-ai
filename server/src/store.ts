@@ -23,7 +23,9 @@ export async function initStore() {
   try {
     const name = "pg"; const mod: any = await import(name);
     const Pool = (mod.default || mod).Pool;
-    const p = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, max: 3 });
+    // sslmode/uselibpqcompat havoladan olib tashlanadi: SSL quyida aniq beriladi (pg ogohlantirishi shu tufayli chiqardi)
+    const url = (() => { try { const x = new URL(DB_URL); x.searchParams.delete("sslmode"); x.searchParams.delete("uselibpqcompat"); return x.toString(); } catch { return DB_URL; } })();
+    const p = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 3 });
     await p.query("create table if not exists kv (key text primary key, value jsonb not null, updated_at timestamptz default now())");
     const r = await p.query("select value from kv where key = 'db'");
     if (r.rows[0]) db = { ...db, ...r.rows[0].value };

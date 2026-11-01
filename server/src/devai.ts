@@ -336,10 +336,11 @@ async function runAgent(history: { role: "user" | "assistant"; text: string }[],
   const fin = await groqChat(plain, { models: GROQ_TEXT_MODELS, temperature: 0.2, maxTokens: 2000, timeoutMs: 50000 });
   return fin ? { reply: await ensureUz(fin.text), patches: newPatches(), steps } : { reply: "", patches: newPatches(), steps, error: groqLastError || "AI yakuniy javob bermadi." };
 }
+const noMd = (s: string) => s.replace(/\*\*/g, "").replace(/^#{1,4}\s*/gm, "");
 async function ensureUz(text: string): Promise<string> {
-  const t = text.trim(); if (!t || looksUzbek(t)) return t;
+  const t = noMd(text.trim()); if (!t || looksUzbek(t)) return t;
   const r = await groqChat([{ role: "system", content: "Quyidagi matnni ma'nosini saqlagan holda FAQAT lotin yozuvidagi sof o‘zbek tilida qayta yoz. Kod, fayl nomlari va texnik atamalarni o‘zgartirma. " + UZ_STYLE }, { role: "user", content: t }], { models: GROQ_TEXT_MODELS, temperature: 0.1, maxTokens: 2000, timeoutMs: 30000 });
-  return r && r.text ? r.text : t;
+  return r && r.text ? noMd(r.text) : t;
 }
 
 // ---------------------------------------------------------------- doimiy tahlil (rejalashtirilgan)

@@ -8,11 +8,11 @@ const BASE = "https://api.groq.com/openai/v1";
 
 const uniq = (a: (string | undefined)[]) => [...new Set(a.filter((x): x is string => !!x && x.trim().length > 0).map(x => x.trim()))];
 export const groqModelA = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-export const groqModelB = process.env.GROQ_MODEL_2 || "llama-3.3-70b-versatile";
+export const groqModelB = process.env.GROQ_MODEL_2 || "openai/gpt-oss-20b";
 /** Matn uchun modellar tartibi (oldingisi ishlamasa keyingisi sinaladi). */
-export const GROQ_TEXT_MODELS = uniq([groqModelA, groqModelB, "openai/gpt-oss-20b"]);
+export const GROQ_TEXT_MODELS = uniq([groqModelA, groqModelB, "llama-3.3-70b-versatile"]);
 /** Asboblar (tool use) bilan ishlash uchun: Llama 3.3 eng ishonchli. */
-export const GROQ_TOOL_MODELS = uniq([process.env.GROQ_TOOL_MODEL, "llama-3.3-70b-versatile", "openai/gpt-oss-120b"]);
+export const GROQ_TOOL_MODELS = uniq([process.env.GROQ_TOOL_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"]);
 export const GROQ_STT_MODEL = process.env.GROQ_STT_MODEL || "whisper-large-v3";
 
 export let groqLastError = "";
@@ -23,10 +23,30 @@ export type ChatResult = { text: string; message: any; model: string };
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// Hisobingizda mavjud modellar (Groq /models). Mavjud bo'lmagan model (404) so'rovlarni sekinlashtirmasligi uchun avtomatik chetlab o'tiladi.
+let availSet: Set<string> | null = null, availAt = 0;
+const deadModels = new Set<string>();
+async function availableModels(): Promise<Set<string> | null> {
+  if (availSet && Date.now() - availAt < 3600e3) return availSet;
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(`${BASE}/models`, { headers: { authorization: `Bearer ${GROQ_KEY}` }, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) return availSet;
+    const j: any = await r.json();
+    const ids = (Array.isArray(j?.data) ? j.data : []).map((m: any) => String(m?.id || "")).filter(Boolean);
+    if (ids.length) { availSet = new Set<string>(ids); availAt = Date.now(); }
+  } catch { clearTimeout(t); }
+  return availSet;
+}
+
 /** Groq chat so‘rovi. Model ishlamasa yoki limit tugasa keyingi modelga o‘tadi. Hammasi yiqilsa null (sabab groqLastError da). */
 export async function groqChat(messages: ChatMsg[], o: ChatOpts = {}): Promise<ChatResult | null> {
   if (!groqEnabled) { groqLastError = "GROQ_API_KEY sozlanmagan."; return null; }
-  const models = o.models && o.models.length ? o.models : GROQ_TEXT_MODELS;
+  let models = o.models && o.models.length ? o.models : GROQ_TEXT_MODELS;
+  const av = await availableModels();
+  if (av) { const ok = models.filter(m => av.has(m)); if (ok.length) models = ok; }
+  const alive = models.filter(m => !deadModels.has(m)); if (alive.length) models = alive;
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const ctrl = new AbortController();
@@ -53,6 +73,7 @@ export async function groqChat(messages: ChatMsg[], o: ChatOpts = {}): Promise<C
           const t = (await r.text().catch(() => "")).slice(0, 400);
           groqLastError = `Groq xatosi ${r.status}: ${t.slice(0, 160)}`;
           console.error("Groq xato:", model, r.status, t);
+          if (r.status === 404) deadModels.add(model); // bu hisobda yo'q model: keyingi so'rovlarda o'tkazib yuboriladi
           break; // 400/401/404: bu model yaroqsiz, keyingisiga
         }
         const j: any = await r.json();

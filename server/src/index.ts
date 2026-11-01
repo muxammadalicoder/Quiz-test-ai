@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { makeToken, readToken, verifyInitData } from "./auth.js";
 import { startBot } from "./bot.js";
-import { OPT_MAX, Q_MAX, aiAllowed, aiEnabled, aiVerificationReady, chatReply, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, ttsReady, verifyQuizQuestions } from "./ai.js";
+import { OPT_MAX, Q_MAX, aiAllowed, aiEnabled, aiVerificationReady, chatReply, explain, listenChoice, parseQuizDocxText, parseQuizPdf, tts, ttsCached, ttsLastError, ttsReady, verifyQuizQuestions } from "./ai.js";
 import { groqEnabled, groqLastError, groqTranscribe } from "./groq.js";
 import { installErrorCapture, recordError, registerDevAi, startDevAi } from "./devai.js";
 import { Quiz, Question, User, flushNow, initStore, level, newUser, publicUser, quizzes, save, seedQuizzes, uid, userByTg, users } from "./store.js";
@@ -416,9 +416,17 @@ app.post("/api/ai/tts", auth, limit(40, 60000), async (req, res) => {
     const hit = ttsCached(text); if (hit) return res.json(hit);
     if (!aiAllowed(me(req).id, "tts")) return res.status(429).json({ error: "Bugungi ovoz limiti tugadi." });
     const out = await tts(text);
-    if (!out) return res.status(502).json({ error: "Ovoz yaratilmadi." });
+    if (!out) return res.status(502).json({ error: ("Ovoz yaratilmadi. " + ttsLastError()).trim() });
     res.json(out);
   } catch (e) { console.error("TTS yo‘li xatosi:", e); res.status(500).json({ error: "Ovoz yaratishda xatolik." }); }
+});
+// Ovoz diagnostikasi: brauzerda oching, natija JSON ko'rinadi (audio qaytarmaydi). Daqiqasiga 6 ta so'rov bilan cheklangan.
+app.get("/api/ai/tts-status", limit(6, 60000), async (_req, res) => {
+  const t0 = Date.now();
+  try {
+    const out = await tts("Salom, bu sinov.");
+    res.json({ ready: ttsReady(), ok: !!out, mime: out?.mime || null, ms: Date.now() - t0, error: out ? "" : (ttsLastError() || "noma'lum sabab") });
+  } catch (e) { res.json({ ready: ttsReady(), ok: false, error: String(e).slice(0, 160) }); }
 });
 app.post("/api/ai/listen", auth, limit(40, 60000), async (req, res) => {
   if (!aiEnabled) return res.status(503).json({ error: "AI o‘chiq." });

@@ -35,7 +35,7 @@ async function speakServer(text: string): Promise<boolean> {
     const r = await api("/api/ai/tts", { body: { text } });
     return await new Promise<boolean>(resolve => {
       stopSpeak();
-      player.src = "data:audio/wav;base64," + r.audio;
+      player.src = `data:${r.mime || "audio/wav"};base64,${r.audio}`;
       const done = (ok: boolean) => () => { if (playDone) { playDone = null; resolve(ok); } };
       playDone = done(true);
       player.onended = done(true); player.onerror = done(false);

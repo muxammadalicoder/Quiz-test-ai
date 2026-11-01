@@ -20,6 +20,7 @@ export function pickVoice(): { voice: SpeechSynthesisVoice | null; exact: boolea
 // --- Server ovozi (Gemini TTS): bitta <audio> elementi qayta ishlatiladi (iPhone uchun muhim) ---
 const player = new Audio();
 let playDone: (() => void) | null = null;
+let playUrl = "";
 const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 /** Foydalanuvchi tugmani bosgan zahoti chaqiring: keyingi ovozlarga brauzer ruxsat beradi. */
 export function unlockAudio() { try { player.src = SILENT; player.play().catch(() => {}); } catch { /* yo'q */ } }
@@ -35,7 +36,11 @@ async function speakServer(text: string): Promise<boolean> {
     const r = await api("/api/ai/tts", { body: { text } });
     return await new Promise<boolean>(resolve => {
       stopSpeak();
-      player.src = `data:${r.mime || "audio/wav"};base64,${r.audio}`;
+      // Ikkinchi loyihadagidek: base64 → Blob → object URL (Telegram/iPhone'da data: havoladan ishonchliroq)
+      if (playUrl) { URL.revokeObjectURL(playUrl); playUrl = ""; }
+      const bytes = Uint8Array.from(atob(r.audio), (c: string) => c.charCodeAt(0));
+      playUrl = URL.createObjectURL(new Blob([bytes], { type: r.mime || "audio/mpeg" }));
+      player.src = playUrl;
       const done = (ok: boolean) => () => { if (playDone) { playDone = null; resolve(ok); } };
       playDone = done(true);
       player.onended = done(true); player.onerror = done(false);

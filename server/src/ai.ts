@@ -110,7 +110,7 @@ const TTS_TRIES: Try[] = [
   { model: "gemini-3.1-flash-tts-preview", style: false }
 ];
 let ttsFirst = 0; // oxirgi ishlagan variant shu yerdan boshlanadi
-const cache = new Map<string, string>();
+const cache = new Map<string, { audio: string; mime: string }>();
 function wav(pcm: Buffer, rate: number) {
   const h = Buffer.alloc(44);
   h.write("RIFF", 0); h.writeUInt32LE(36 + pcm.length, 4); h.write("WAVEfmt ", 8); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20);
@@ -121,8 +121,8 @@ function wav(pcm: Buffer, rate: number) {
 export const ttsCached = (text: string) => cache.get(text) || null;
 
 const AZ_KEY = process.env.AZURE_SPEECH_KEY || "", AZ_REGION = process.env.AZURE_SPEECH_REGION || "";
-/** Server tomonida o'zbekcha ovoz chiqarish mumkinmi (Azure uz-UZ yoki Gemini). Yo'q bo'lsa brauzer ovozi ishlatiladi. */
-export const ttsEnabled = !!(AZ_KEY && AZ_REGION) || !!KEY;
+/** Server tomonida o'zbekcha ovoz mumkinmi (Azure, bepul Edge yoki Gemini). Hech biri ishlamasa brauzer ovozi ishlatiladi. */
+export const ttsReady = () => !!(AZ_KEY && AZ_REGION) || !!KEY || (process.env.TTS_EDGE !== "off" && !edgeBroken);
 const xmlEsc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 /** Azure Neural TTS: uz-UZ-MadinaNeural / uz-UZ-SardorNeural — haqiqiy o'zbekcha ovoz. */
 async function ttsAzure(text: string): Promise<string | null> {
@@ -141,13 +141,42 @@ async function ttsAzure(text: string): Promise<string | null> {
     return Buffer.from(await r.arrayBuffer()).toString("base64");
   } catch (e) { clearTimeout(t); console.error("Azure TTS so'rov xatosi:", String(e)); return null; }
 }
-export async function tts(text: string): Promise<string | null> {
-  const hit = cache.get(text); if (hit) return hit;
-  if (AZ_KEY && AZ_REGION) {
-    const a = await ttsAzure(text);
-    if (a) { if (cache.size > 300) cache.delete(cache.keys().next().value as string); if (text.length <= 80) cache.set(text, a); return a; }
+/** Microsoft Edge "o'qib berish" xizmati (msedge-tts paketi): kalitsiz, uz-UZ-MadinaNeural / uz-UZ-SardorNeural. Norasmiy, shuning uchun zaxira sifatida. */
+const edgeAllowed = process.env.TTS_EDGE !== "off";
+let edgeBroken = false; // paket o'rnatilmagan bo'lsa qayta urinmaymiz
+async function ttsEdge(text: string): Promise<string | null> {
+  if (!edgeAllowed || edgeBroken) return null;
+  const spoken = text.replace(/[\u2018\u2019\u02BB\u02BC`\u00B4]/g, "'");
+  try {
+    const name = "msedge-tts"; const mod: any = await import(name);
+    const lib = mod.MsEdgeTTS ? mod : mod.default;
+    const engine = new lib.MsEdgeTTS();
+    await engine.setMetadata(process.env.EDGE_TTS_VOICE || "uz-UZ-MadinaNeural", lib.OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioStream } = engine.toStream(spoken);
+    const chunks: any[] = [];
+    await Promise.race([
+      (async () => { for await (const c of audioStream) chunks.push(Buffer.from(c)); })(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("Edge TTS vaqti tugadi")), 20000))
+    ]);
+    const buf = Buffer.concat(chunks);
+    return buf.length > 200 ? buf.toString("base64") : null;
+  } catch (e) {
+    const msg = String(e);
+    if (/Cannot find|MODULE_NOT_FOUND/i.test(msg)) edgeBroken = true;
+    console.error("Edge TTS xatosi:", msg.slice(0, 200));
+    return null;
   }
-  return KEY ? ttsGemini(text) : null;
+}
+
+export type TtsOut = { audio: string; mime: string };
+/** Ovoz yaratish tartibi: Azure (kalit bor bo'lsa) → Edge (bepul) → Gemini. */
+export async function tts(text: string): Promise<TtsOut | null> {
+  const hit = cache.get(text); if (hit) return hit;
+  const keep = (o: TtsOut) => { if (cache.size > 300) cache.delete(cache.keys().next().value as string); if (text.length <= 80) cache.set(text, o); return o; };
+  if (AZ_KEY && AZ_REGION) { const a = await ttsAzure(text); if (a) return keep({ audio: a, mime: "audio/wav" }); }
+  const e = await ttsEdge(text); if (e) return keep({ audio: e, mime: "audio/mpeg" });
+  if (KEY) { const g = await ttsGemini(text); if (g) return keep({ audio: g, mime: "audio/wav" }); }
+  return null;
 }
 async function ttsGemini(text: string): Promise<string | null> {
   // O'zbekcha o'/g' belgilari (‘ ’ ʻ) ba'zan noto'g'ri o'qiladi: oddiy apostrofga keltiramiz
@@ -174,8 +203,6 @@ async function ttsGemini(text: string): Promise<string | null> {
       const out = /wav/i.test(mime) ? part.inlineData.data
         : wav(Buffer.from(part.inlineData.data, "base64"), Number(/rate=(\d+)/.exec(mime)?.[1]) || 24000).toString("base64");
       if (ttsFirst !== idx) { ttsFirst = idx; console.log("TTS ishlayapti:", model, "style=" + style); }
-      if (cache.size > 300) cache.delete(cache.keys().next().value as string);
-      if (text.length <= 80) cache.set(text, out);
       return out;
     } catch (e) { console.error("TTS so'rov xatosi:", model, String(e)); }
   }

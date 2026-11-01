@@ -95,7 +95,7 @@ export async function groqTranscribe(audio: Buffer, mime: string, o: { prompt?: 
     const timer = setTimeout(() => ctrl.abort(), 30000);
     try {
       const form = new FormData();
-      form.append("file", new Blob([audio], { type: mime.split(";")[0] || "audio/webm" }), `audio.${ext}`);
+      form.append("file", new Blob([new Uint8Array(audio)], { type: mime.split(";")[0] || "audio/webm" }), `audio.${ext}`);
       form.append("model", o.model || GROQ_STT_MODEL);
       form.append("language", o.language || "uz");
       form.append("response_format", "json");

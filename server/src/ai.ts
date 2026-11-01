@@ -8,7 +8,7 @@ const KEY = process.env.GEMINI_API_KEY || "";
 const MODELS = [...new Set([...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []), "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3-flash-preview"])];
 const USER_DAILY = Number(process.env.AI_DAILY_LIMIT || 60);   // bitta foydalanuvchiga kuniga
 const GLOBAL_DAILY = Number(process.env.AI_GLOBAL_DAILY || 2000); // butun ilova uchun kuniga (hamma turdagi so'rovlar)
-const CAPS: Record<string, number> = { explain: USER_DAILY, tts: Number(process.env.AI_TTS_DAILY || 250), listen: Number(process.env.AI_LISTEN_DAILY || 120), pdf: Number(process.env.AI_PDF_DAILY || 5), chat: Number(process.env.AI_CHAT_DAILY || 80), verify: Number(process.env.AI_VERIFY_DAILY || 8) };
+const CAPS: Record<string, number> = { explain: USER_DAILY, tts: Number(process.env.AI_TTS_DAILY || 1000), listen: Number(process.env.AI_LISTEN_DAILY || 120), pdf: Number(process.env.AI_PDF_DAILY || 5), chat: Number(process.env.AI_CHAT_DAILY || 80), verify: Number(process.env.AI_VERIFY_DAILY || 8) };
 export const geminiEnabled = !!KEY;
 /** Matn/ovozni tanish uchun kamida bitta LLM kaliti bor (Groq yoki Gemini). */
 export const aiEnabled = groqEnabled || !!KEY;
@@ -19,8 +19,9 @@ export type AiKind = "explain" | "tts" | "listen" | "pdf" | "chat" | "verify";
 export function aiAllowed(userId: string, kind: AiKind = "explain") {
   const d = day(); if (gDay !== d) { gDay = d; gCount = 0; perUser.clear(); }
   const k = kind + ":" + userId; const n = perUser.get(k) || 0;
-  if (!aiEnabled || gCount >= GLOBAL_DAILY || n >= CAPS[kind]) return false;
-  perUser.set(k, n + 1); gCount++; return true;
+  // Ovoz (tts) bepul manbalardan ham chiqadi: umumiy AI byudjetini (GLOBAL_DAILY) yemaydi, faqat foydalanuvchi limiti bor
+  if (!aiEnabled || (kind !== "tts" && gCount >= GLOBAL_DAILY) || n >= CAPS[kind]) return false;
+  perUser.set(k, n + 1); if (kind !== "tts") gCount++; return true;
 }
 
 async function generate(system: string, parts: any[], json = false, maxOutputTokens = 700, timeoutMs = 12000): Promise<string | null> {
@@ -122,7 +123,7 @@ export const ttsCached = (text: string) => cache.get(text) || null;
 
 const AZ_KEY = process.env.AZURE_SPEECH_KEY || "", AZ_REGION = process.env.AZURE_SPEECH_REGION || "";
 /** Server tomonida o'zbekcha ovoz mumkinmi (Azure, bepul Edge yoki Gemini). Hech biri ishlamasa brauzer ovozi ishlatiladi. */
-export const ttsReady = () => !!(AZ_KEY && AZ_REGION) || !!KEY || (process.env.TTS_EDGE !== "off" && !edgeBroken);
+export const ttsReady = () => !!(AZ_KEY && AZ_REGION) || !!KEY || !!ELEVEN_KEY || (process.env.TTS_EDGE !== "off" && !edgeBroken);
 const xmlEsc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 /** Azure Neural TTS: uz-UZ-MadinaNeural / uz-UZ-SardorNeural — haqiqiy o'zbekcha ovoz. */
 async function ttsAzure(text: string): Promise<string | null> {
@@ -142,6 +143,23 @@ async function ttsAzure(text: string): Promise<string | null> {
   } catch (e) { clearTimeout(t); console.error("Azure TTS so'rov xatosi:", String(e)); return null; }
 }
 /** Microsoft Edge "o'qib berish" xizmati (msedge-tts paketi): kalitsiz, uz-UZ-MadinaNeural / uz-UZ-SardorNeural. Norasmiy, shuning uchun zaxira sifatida. */
+const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || "";
+/** ElevenLabs (ikkinchi loyihadagi kabi): ELEVENLABS_API_KEY bo'lsa birinchi shu ishlaydi. */
+async function ttsEleven(text: string): Promise<string | null> {
+  const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST", signal: ctrl.signal,
+      headers: { Accept: "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY },
+      body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" })
+    });
+    clearTimeout(t);
+    if (!r.ok) { ttsErr += ` ElevenLabs: ${r.status}.`; return null; }
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.length > 100 ? buf.toString("base64") : null;
+  } catch (e) { clearTimeout(t); ttsErr += ` ElevenLabs: ${String(e).slice(0, 60)}.`; return null; }
+}
 let ttsErr = "";
 /** Oxirgi ovoz yaratish urinishlari nega yiqilgani (ekranda ko'rsatiladi). */
 export const ttsLastError = () => ttsErr.trim().slice(0, 220);
@@ -154,7 +172,7 @@ async function ttsEdge(text: string): Promise<string | null> {
     const name = "msedge-tts"; const mod: any = await import(name);
     const lib = mod.MsEdgeTTS ? mod : mod.default;
     const engine = new lib.MsEdgeTTS();
-    await engine.setMetadata(process.env.EDGE_TTS_VOICE || "uz-UZ-MadinaNeural", lib.OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    await engine.setMetadata(process.env.EDGE_TTS_VOICE || "uz-UZ-SardorNeural", lib.OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     const { audioStream } = engine.toStream(spoken);
     const chunks: any[] = [];
     await Promise.race([
@@ -201,11 +219,12 @@ async function ttsGoogle(text: string): Promise<string | null> {
 }
 
 export type TtsOut = { audio: string; mime: string };
-/** Ovoz yaratish tartibi: Azure (kalit bor bo'lsa) → Edge (bepul) → Google Translate → Gemini. */
+/** Ovoz yaratish tartibi (ikkinchi loyihadagidek): ElevenLabs (kalit bo'lsa) → Azure (kalit bo'lsa) → Edge uz-UZ (bepul) → Google → Gemini. */
 export async function tts(text: string): Promise<TtsOut | null> {
   const hit = cache.get(text); if (hit) return hit;
   ttsErr = "";
   const keep = (o: TtsOut) => { if (cache.size > 300) cache.delete(cache.keys().next().value as string); if (text.length <= 80) cache.set(text, o); return o; };
+  if (ELEVEN_KEY) { const x = await ttsEleven(text); if (x) return keep({ audio: x, mime: "audio/mpeg" }); }
   if (AZ_KEY && AZ_REGION) { const a = await ttsAzure(text); if (a) return keep({ audio: a, mime: "audio/wav" }); }
   const e = await ttsEdge(text); if (e) return keep({ audio: e, mime: "audio/mpeg" });
   const gg = await ttsGoogle(text); if (gg) return keep({ audio: gg, mime: "audio/mpeg" });

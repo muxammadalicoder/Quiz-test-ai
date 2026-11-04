@@ -11,6 +11,7 @@ import Solo from "./Solo";
 import Chat from "./Chat";
 import DevAi from "./DevAi";
 import Memorize from "./Memorize";
+import Landing from "./Landing";
 import Room, { RoomState } from "./Room";
 import { playClick, setSoundsEnabled, soundsEnabled, startBackgroundMusic, startTestMusic, stopBackgroundMusic } from "./sounds";
 
@@ -37,6 +38,7 @@ export default function App() {
   const [count, setCount] = useState(0);
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [talk, setTalk] = useState(false);
+  const [landing, setLanding] = useState(true);
   const [soundOn, setSoundOn] = useState(() => soundsEnabled());
   const socketRef = useRef<Socket | null>(null);
 
@@ -64,7 +66,7 @@ export default function App() {
   const say = useCallback((text: string, bad = false) => { setToast({ text, bad }); setTimeout(() => setToast(null), 3200); }, []);
 
   useEffect(() => {
-    try { tg?.ready(); tg?.expand(); tg?.disableVerticalSwipes?.(); tg?.setHeaderColor?.("#0b0d1c"); tg?.setBackgroundColor?.("#0b0d1c"); } catch { /* yo'q */ }
+    try { tg?.ready(); tg?.expand(); tg?.disableVerticalSwipes?.(); tg?.setHeaderColor?.("#09030b"); tg?.setBackgroundColor?.("#09030b"); } catch { /* yo'q */ }
     setAuthFailHandler(() => { setToken(""); setUser(null); if (inTelegram) location.reload(); else setBoot("login"); });
     (async () => {
       let c: Config = cfg;
@@ -119,6 +121,7 @@ export default function App() {
   };
 
   if (boot === "loading") return <div className="splash"><div className="logo">🎯</div><i className="spinner" /></div>;
+  if ((boot === "tgonly" || boot === "login") && landing) return <Landing bot={cfg.bot} guest={cfg.guest} onGuest={() => setLanding(false)} />;
   if (boot === "tgonly") return (
     <div className="splash"><div className="logo">🎯</div><h1 className="h1">Quiz Arena</h1>
       <p className="muted center-t">Xavfsiz kirish uchun ilovani Telegram bot orqali oching.</p>

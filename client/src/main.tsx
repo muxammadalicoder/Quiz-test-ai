@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import ErrorBoundary, { installClientErrorReporting } from "./ErrorBoundary";
 import "./styles.css";
+import "./landing.css";
 
 installClientErrorReporting();
 createRoot(document.getElementById("root")!).render(
